@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using DscsEvolutionPlanner.Core;
 using DscsEvolutionPlanner.ViewModel;
@@ -23,28 +24,45 @@ public sealed class RouteChain : Panel
     /// <summary>换行处箭头上下各留一点空隙。</summary>
     private const double RowGap = 8;
 
-    private static readonly ScaleTransform Mirror = CreateMirror();
+    /// <summary>箭头本体（↗ / ↘ / ⇄ / →）的字号。</summary>
+    private const double ArrowGlyphSize = 20;
+
+    /// <summary>箭头下面那行语义文字（进化 / 退化 / 形态转换 / 回落）的字号。</summary>
+    private const double ArrowLabelSize = 9.5;
+
+    /// <summary>箭头画出来的样子：一行箭头 + 一行语义文字。</summary>
+    private sealed class ArrowVisual
+    {
+        public required TextBlock Root { get; init; }
+        public required Run Glyph { get; init; }
+        public required Run Label { get; init; }
+    }
 
     /// <summary>箭头在一块行里的位置：行内正向 / 行内反向（要镜像）/ 换行处（竖着）。</summary>
     private enum ArrowPlacement { Inline, Mirrored, Wrap }
 
     private readonly List<RouteStepVm> _steps = new();
+    private readonly List<ArrowVisual> _arrows = new();
     private readonly List<Placed> _layout = new();
 
     private readonly struct Placed
     {
-        public Placed(UIElement element, Rect rect, ArrowPlacement placement, int cardIndex)
+        public Placed(UIElement element, Rect rect, ArrowPlacement placement, int cardIndex, ArrowVisual? arrow = null)
         {
             Element = element;
             Rect = rect;
             Placement = placement;
             CardIndex = cardIndex;
+            Arrow = arrow;
         }
 
         public UIElement Element { get; }
         public Rect Rect { get; }
         public ArrowPlacement Placement { get; }
         public int CardIndex { get; }
+
+        /// <summary>箭头才有；卡片是 null。</summary>
+        public ArrowVisual? Arrow { get; }
     }
 
     // ------------------------------------------------------------------ 依赖属性
@@ -77,6 +95,7 @@ public sealed class RouteChain : Panel
     {
         Children.Clear();
         _steps.Clear();
+        _arrows.Clear();
         _layout.Clear();
 
         if (Steps is not null) _steps.AddRange(Steps);
@@ -87,7 +106,12 @@ public sealed class RouteChain : Panel
             var step = _steps[i];
 
             // 第 0 只前面没有箭头，所以每个箭头排在它后面那张卡前面
-            if (i > 0) Children.Add(MakeArrow(i));
+            if (i > 0)
+            {
+                var arrow = MakeArrow(i);
+                _arrows.Add(arrow);
+                Children.Add(arrow.Root);
+            }
             Children.Add(new ContentControl
             {
                 Content = step,
@@ -99,24 +123,31 @@ public sealed class RouteChain : Panel
         }
     }
 
-    /// <summary>第 i 只前面的那条箭头（方向由排布决定：行内正向 / 行内反向镜像 / 换行处竖着）。</summary>
-    private TextBlock MakeArrow(int i)
+    /// <summary>
+    /// 第 i 只前面的那条箭头：上面一行是方向箭头，下面一行是语义文字（进化 / 退化 / 形态转换 / 回落）。
+    /// 光看方向盘箭头（尤其换行反向之后变成 ↖ / ↙）容易在心里翻译一遍，配上文字就不用猜了。
+    /// </summary>
+    private ArrowVisual MakeArrow(int i)
     {
         var step = _steps[i];
-        return new TextBlock
+        var glyph = new Run(step.ArrowGlyph) { FontSize = ArrowGlyphSize, FontWeight = FontWeights.Bold };
+        var label = new Run(step.ArrowLabel) { FontSize = ArrowLabelSize };
+
+        var root = new TextBlock
         {
-            Text = step.ArrowGlyph,
             Foreground = Theme.Brush(step.ArrowKey),
-            FontSize = 19,
-            FontWeight = FontWeights.Bold,
             TextAlignment = TextAlignment.Center,
             Width = ArrowWidth,
             VerticalAlignment = VerticalAlignment.Center,
             HorizontalAlignment = HorizontalAlignment.Center,
-            RenderTransformOrigin = new Point(0.5, 0.5),
             SnapsToDevicePixels = true,
             ToolTip = $"{step.ArrowLabel}：{_steps[i - 1].Name} → {step.Name}",
         };
+        root.Inlines.Add(glyph);
+        root.Inlines.Add(new LineBreak());
+        root.Inlines.Add(label);
+
+        return new ArrowVisual { Root = root, Glyph = glyph, Label = label };
     }
 
     // ------------------------------------------------------------------ 量尺寸
@@ -170,20 +201,21 @@ public sealed class RouteChain : Panel
 
                 // 这张卡前面的那条箭头（第 0 只没有）
                 if (cardIndex == 0) continue;
-                var arrow = Children[cardIndex * 2 - 1];
+                var arrow = _arrows[cardIndex - 1];
                 if (j > 0)
                 {
                     // 行内箭头：正向行在左侧，反向行在右侧（两只卡中间）
                     var arrowX = reversed ? cardX + cardWidth : cardX - ArrowWidth;
-                    _layout.Add(new Placed(arrow, new Rect(arrowX, rowTop + (rowHeight - ArrowHeight) / 2,
-                        ArrowWidth, ArrowHeight), reversed ? ArrowPlacement.Mirrored : ArrowPlacement.Inline, cardIndex));
+                    _layout.Add(new Placed(arrow.Root, new Rect(arrowX, rowTop + (rowHeight - ArrowHeight) / 2,
+                        ArrowWidth, ArrowHeight), reversed ? ArrowPlacement.Mirrored : ArrowPlacement.Inline,
+                        cardIndex, arrow));
                 }
                 else
                 {
                     // 换行箭头：竖着放在两行之间，对准上下那两只卡
-                    _layout.Add(new Placed(arrow, new Rect(cardX + (cardWidth - ArrowWidth) / 2,
+                    _layout.Add(new Placed(arrow.Root, new Rect(cardX + (cardWidth - ArrowWidth) / 2,
                         rowTop - ArrowHeight - RowGap / 2, ArrowWidth, ArrowHeight),
-                        ArrowPlacement.Wrap, cardIndex));
+                        ArrowPlacement.Wrap, cardIndex, arrow));
                 }
             }
 
@@ -208,41 +240,42 @@ public sealed class RouteChain : Panel
         foreach (var placed in _layout)
         {
             placed.Element.Arrange(placed.Rect);
-            if (placed.Element is not TextBlock arrow) continue;
+            if (placed.Arrow is not { } arrow) continue;
 
-            // 箭头方向随位置变化：行内反向要镜像，换行处改成竖箭头
-            switch (placed.Placement)
+            // 箭头方向随位置变化：行内反向换成镜像箭头，换行处换成竖箭头
+            var source = _steps[placed.CardIndex].ArrowGlyph;
+            var glyph = placed.Placement switch
             {
-                case ArrowPlacement.Wrap:
-                    SetArrow(arrow, WrapGlyph(_steps[placed.CardIndex].ArrowGlyph), mirrored: false);
-                    break;
-                case ArrowPlacement.Mirrored:
-                    SetArrow(arrow, _steps[placed.CardIndex].ArrowGlyph, mirrored: true);
-                    break;
-                default:
-                    SetArrow(arrow, _steps[placed.CardIndex].ArrowGlyph, mirrored: false);
-                    break;
-            }
+                ArrowPlacement.Wrap => WrapGlyph(source),
+                ArrowPlacement.Mirrored => MirrorGlyph(source),
+                _ => source,
+            };
+
+            SetArrow(arrow, glyph, _steps[placed.CardIndex].ArrowLabel);
         }
 
         return finalSize;
     }
 
     /// <summary>只在真的变了的时候改，避免反复触发重新布局。</summary>
-    private static void SetArrow(TextBlock arrow, string text, bool mirrored)
+    private static void SetArrow(ArrowVisual arrow, string glyph, string label)
     {
-        if (!string.Equals(arrow.Text, text, StringComparison.Ordinal)) arrow.Text = text;
-        var transform = mirrored ? Mirror : null;
-        if (!ReferenceEquals(arrow.RenderTransform, transform)) arrow.RenderTransform = transform;
+        if (!string.Equals(arrow.Glyph.Text, glyph, StringComparison.Ordinal)) arrow.Glyph.Text = glyph;
+        if (!string.Equals(arrow.Label.Text, label, StringComparison.Ordinal)) arrow.Label.Text = label;
     }
 
     /// <summary>换行处的竖箭头：形态转换（⇄）用 ⇅，其余用 ↓。</summary>
     private static string WrapGlyph(string glyph) => glyph == "⇄" ? "⇅" : "↓";
 
-    private static ScaleTransform CreateMirror()
+    /// <summary>
+    /// 反向行里箭头要指向左边。这里换字形而不是给整块做水平镜像——
+    /// 镜像会把下面那行「进化 / 退化」也照成反字。
+    /// </summary>
+    private static string MirrorGlyph(string glyph) => glyph switch
     {
-        var mirror = new ScaleTransform(-1, 1);
-        mirror.Freeze();
-        return mirror;
-    }
+        "↗" => "↖",
+        "↘" => "↙",
+        "→" => "←",
+        _ => glyph,   // ⇄ 本身左右对称
+    };
 }

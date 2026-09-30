@@ -1,7 +1,9 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -29,10 +31,93 @@ public partial class ShellView : Window
         DataContext = Shell;
 
         InitializeComponent();
+
+        if (startup.Maximized) WindowState = WindowState.Maximized;
     }
 
     /// <summary>壳的视图模型（App 截图时要用）。</summary>
     public MainViewModel Shell { get; }
+
+    // ------------------------------------------------------------------ 最大化时对齐显示器工作区
+    // 自绘标题栏（WindowStyle=None）的窗口被最大化时，Windows 按「整块屏幕」给尺寸，
+    // 窗口因此比工作区高出任务栏那一条；任务栏又在最上层，正好把最下面的状态栏盖掉。
+    // 这里自己回答 WM_GETMINMAXINFO，把最大化尺寸限制在窗口所在显示器的工作区里。
+    private const int WmGetMinMaxInfo = 0x0024;
+    private const uint MonitorDefaultToNearest = 0x00000002;
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        if (PresentationSource.FromVisual(this) is HwndSource source) source.AddHook(WindowProcedure);
+    }
+
+    private static IntPtr WindowProcedure(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (message != WmGetMinMaxInfo) return IntPtr.Zero;
+
+        // 置为已处理：默认那套按整块屏幕算，正是状态栏被盖住的原因
+        ApplyWorkAreaMaximizedSize(hwnd, lParam);
+        handled = true;
+        return IntPtr.Zero;
+    }
+
+    private static void ApplyWorkAreaMaximizedSize(IntPtr hwnd, IntPtr lParam)
+    {
+        var info = Marshal.PtrToStructure<MinMaxInfo>(lParam);
+        var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+        if (monitor == IntPtr.Zero) return;
+
+        var screen = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        if (!GetMonitorInfo(monitor, ref screen)) return;
+
+        info.MaxPosition.X = screen.Work.Left - screen.Monitor.Left;
+        info.MaxPosition.Y = screen.Work.Top - screen.Monitor.Top;
+        info.MaxSize.X = screen.Work.Right - screen.Work.Left;
+        info.MaxSize.Y = screen.Work.Bottom - screen.Work.Top;
+        Marshal.StructureToPtr(info, lParam, true);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MinMaxInfo
+    {
+        public NativePoint Reserved;
+        public NativePoint MaxSize;
+        public NativePoint MaxPosition;
+        public NativePoint MinTrackSize;
+        public NativePoint MaxTrackSize;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MonitorInfo
+    {
+        public int Size;
+        public NativeRect Monitor;
+        public NativeRect Work;
+        public uint Flags;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
 
     protected override async void OnContentRendered(EventArgs e)
     {

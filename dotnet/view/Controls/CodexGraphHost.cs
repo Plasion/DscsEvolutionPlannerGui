@@ -11,8 +11,9 @@ using DscsEvolutionPlanner.ViewModel;
 namespace DscsEvolutionPlanner.View;
 
 /// <summary>
-/// 关系网宿主：内部是一个带滚动条的 CodexGraph，负责缩放（按钮 / Ctrl + 滚轮）、拖动平移、
-/// 换中心后把新中心滚到视口正中。视图只需要绑定 <see cref="Graph"/>、<see cref="Zoom"/> 与两个命令。
+/// 关系网宿主：内部是一个 CodexGraph（滚动条按需求隐藏，滚动能力保留），负责缩放（按钮 / Ctrl + 滚轮）、
+/// 拖动平移、Shift + 滚轮横向滚动、换中心后把新中心滚到视口正中。
+/// 视图只需要绑定 <see cref="Graph"/>、<see cref="Zoom"/> 与两个命令。
 /// </summary>
 public sealed class CodexGraphHost : Control
 {
@@ -79,6 +80,17 @@ public sealed class CodexGraphHost : Control
         set => SetValue(NodeTemplateProperty, value);
     }
 
+    public static readonly DependencyProperty CompactTemplateProperty = DependencyProperty.Register(
+        nameof(CompactTemplate), typeof(DataTemplate), typeof(CodexGraphHost),
+        new PropertyMetadata(null, OnGraphChanged));
+
+    /// <summary>收成窄条的那些节点用的模板（原样转给内部的 CodexGraph）。</summary>
+    public DataTemplate? CompactTemplate
+    {
+        get => (DataTemplate?)GetValue(CompactTemplateProperty);
+        set => SetValue(CompactTemplateProperty, value);
+    }
+
     public static readonly DependencyProperty ZoomProperty = DependencyProperty.Register(
         nameof(Zoom), typeof(double), typeof(CodexGraphHost),
         new FrameworkPropertyMetadata(1.0, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnZoomChanged));
@@ -114,6 +126,7 @@ public sealed class CodexGraphHost : Control
         if (_panel is null) return;
         _panel.Graph = Graph;
         _panel.NodeTemplate = NodeTemplate;
+        _panel.CompactTemplate = CompactTemplate;
         _panel.UpdateLayout();
     }
 
@@ -131,8 +144,11 @@ public sealed class CodexGraphHost : Control
         _panel.UpdateLayout();
         if (_panel.RootRect is not { } rect) return;
 
-        var centerX = rect.X + rect.Width / 2;
-        var centerY = rect.Y + rect.Height / 2;
+        // RootRect 是面板自身坐标系里的矩形；面板套了 LayoutTransform（缩放），
+        // 滚动条的量纲是缩放之后的，所以要乘上当前缩放才换算到内容坐标系。
+        var zoom = Zoom;
+        var centerX = (rect.X + rect.Width / 2) * zoom;
+        var centerY = (rect.Y + rect.Height / 2) * zoom;
         _scroll.ScrollToHorizontalOffset(centerX - _scroll.ViewportWidth / 2);
         _scroll.ScrollToVerticalOffset(centerY - _scroll.ViewportHeight / 2);
     }
@@ -143,11 +159,34 @@ public sealed class CodexGraphHost : Control
         SetValue(ViewportOffsetKey, new Point(_scroll.HorizontalOffset, _scroll.VerticalOffset));
     }
 
-    // ------------------------------------------------------------------ 滚轮缩放
+    // ------------------------------------------------------------------ 滚轮：Ctrl 缩放 / Shift 横向 / 其余纵向
     private void OnWheel(object sender, MouseWheelEventArgs e)
     {
-        if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return;   // 不按 Ctrl 就是普通滚动
+        var modifiers = Keyboard.Modifiers;
 
+        if ((modifiers & ModifierKeys.Control) != 0)
+        {
+            // 先吃掉这一下：缩放到极限时若把事件放给 ScrollViewer，就会「回落」成纵向滚动
+            e.Handled = true;
+            ZoomByWheel(e);
+            return;
+        }
+
+        if ((modifiers & ModifierKeys.Shift) != 0)
+        {
+            // Shift + 滚轮 = 横向滚动（与纵向一格的感觉对齐：120 的滚轮量 → 60px）
+            e.Handled = true;
+            _scroll.ScrollToHorizontalOffset(_scroll.HorizontalOffset - e.Delta * WheelScrollFactor);
+        }
+
+        // 其余情况交给 ScrollViewer 自己纵向滚动
+    }
+
+    /// <summary>一格滚轮（120）走多少像素。</summary>
+    private const double WheelScrollFactor = 0.5;
+
+    private void ZoomByWheel(MouseWheelEventArgs e)
+    {
         var step = AppConfig.Current.Codex.ZoomWheelStep;
         var anchor = e.GetPosition(_scroll);
         var before = new Point(_scroll.HorizontalOffset + anchor.X, _scroll.VerticalOffset + anchor.Y);
@@ -157,7 +196,6 @@ public sealed class CodexGraphHost : Control
             AppConfig.Current.Codex.MinZoom, AppConfig.Current.Codex.MaxZoom);
         if (Math.Abs(Zoom - old) < 0.001) return;
 
-        e.Handled = true;
         _scroll.UpdateLayout();
 
         var ratio = Zoom / old;

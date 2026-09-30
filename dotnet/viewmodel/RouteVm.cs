@@ -27,6 +27,9 @@ public sealed class RouteStepVm
     public string Generation { get; init; } = "";
     public string IdText => "#" + Id;
 
+    /// <summary>卡片上那行「#18 · 成长期」（世代缺了就只留编号）。</summary>
+    public string MetaText => Generation.Length > 0 ? $"{IdText} · {Generation}" : IdText;
+
     public BitmapSource? Image { get; init; }
     public bool HasImage => Image is not null;
 

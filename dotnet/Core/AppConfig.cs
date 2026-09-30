@@ -109,8 +109,8 @@ public sealed class AppConfig
         /// <summary>关系网四周留白（同时也是可拖动范围）。</summary>
         public double GraphPadding { get; set; } = 360;
 
-        public double ColumnGap { get; set; } = 76;
-        public double RowGap { get; set; } = 14;
+        public double ColumnGap { get; set; } = 44;
+        public double RowGap { get; set; } = 8;
 
         /// <summary>缩略图解码宽度。</summary>
         public int ThumbnailWidth { get; set; } = 160;

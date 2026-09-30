@@ -41,4 +41,10 @@ public sealed class StartupOptions
 
     /// <summary>--codex-filter：截图验收时预填图鉴筛选框。</summary>
     public string? CodexFilter { get; init; }
+
+    /// <summary>--zoom：图鉴关系网的初始缩放（百分比，null＝100）。</summary>
+    public double? ZoomPercent { get; init; }
+
+    /// <summary>--maximized：启动时直接最大化。</summary>
+    public bool Maximized { get; init; }
 }

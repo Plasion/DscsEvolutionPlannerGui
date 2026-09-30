@@ -30,12 +30,12 @@ public sealed partial class MainViewModel
     private bool _guideBuilt;
     private bool GuideBuilt { get => _guideBuilt; set => _guideBuilt = value; }
     private int? _guideCenterId;
+    private string _codexLoadText = "";
+    private Task? _warmTask;
     private string _assetsDirectory = "";
     private string _statusText = "";
     private string _statusKey = ResourceKeys.SubtleColor;
     private string _envText = "";
-    private string _dataStatus = "尚未加载。";
-    private string _dataStatusKey = ResourceKeys.FaintColor;
 
     /// <summary>可选的图鉴深度（数据来自 config.json）。</summary>
     public List<int> DepthChoices { get; } = new List<int>();
@@ -201,7 +201,62 @@ public sealed partial class MainViewModel
         GuideListStatus = "";
     }
 
-    /// <summary>切到图鉴页：第一次进来要先读缩略图并建网，先露遮罩再干活。</summary>
+    // ============================ 启动时的图鉴预热 ============================
+    /// <summary>状态栏右下角那行静默进度（空＝不显示）。</summary>
+    public string CodexLoadText
+    {
+        get => _codexLoadText;
+        private set { if (Set(ref _codexLoadText, value ?? "")) Raise(nameof(HasCodexLoad)); }
+    }
+
+    public bool HasCodexLoad => _codexLoadText.Length > 0;
+
+    /// <summary>开软件时就把图鉴挂到后台加载：不挡界面，进度只静默写在状态栏右下角。</summary>
+    public void StartGuideWarmUp() => _warmTask ??= WarmUpGuideAsync();
+
+    /// <summary>要图鉴数据的地方都先等这一趟；已经跑完时是瞬间返回。</summary>
+    private Task EnsureGuideWarmUpAsync()
+    {
+        StartGuideWarmUp();
+        return _warmTask!;
+    }
+
+    /// <summary>
+    /// 后台把整份图鉴卡片分块建出来（真正耗时的是按宽度解码 341 张缩略图），
+    /// 于是第一次进图鉴页不用再等一串解码；进度只更新状态栏，不弹窗也不盖遮罩。
+    /// </summary>
+    private async Task WarmUpGuideAsync()
+    {
+        if (_facade is null) return;
+
+        var started = Environment.TickCount64;
+        try
+        {
+            var presenter = _facade.Codex;
+            var total = presenter.Count;
+            const int chunk = 24;   // 一块就是一次进度的粒度
+
+            for (var start = 0; start < total; start += chunk)
+            {
+                var from = start;
+                await Task.Run(() => presenter.BuildEntryRange(from, chunk, _guideCenterId));
+                CodexLoadText = $"图鉴加载 {Math.Min(start + chunk, total)}/{total}";
+                await YieldUi();
+            }
+
+            Log.Write($"[codex] 后台预热完成 耗时 {Environment.TickCount64 - started} ms（{total} 只）");
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"[codex] 预热失败：{ex.Message}");
+        }
+        finally
+        {
+            CodexLoadText = "";
+        }
+    }
+
+    /// <summary>切到图鉴页：启动时那趟预热通常已经建好了，直接摆出来就是瞬间的事。</summary>
     public async Task ShowGuideAsync()
     {
         if (IsGuideMode) return;
@@ -213,12 +268,13 @@ public sealed partial class MainViewModel
         await YieldUi();
 
         var started = Environment.TickCount64;
+        await EnsureGuideWarmUpAsync();
         RefreshGuideList();
         await BuildGuideAsync(useStart: true);
         _guideBuilt = true;
         GuideBusy = false;
 
-        Log.Write($"[codex] 首次生成耗时 {Environment.TickCount64 - started} ms（节点 {GuideGraph?.Nodes.Count ?? 0}）");
+        Log.Write($"[codex] 首次进入图鉴耗时 {Environment.TickCount64 - started} ms（节点 {GuideGraph?.Nodes.Count ?? 0}）");
     }
 
     /// <summary>换个中心：重建关系网、把它显示在详情栏，并让视图把中心滚回视口。</summary>
@@ -231,6 +287,7 @@ public sealed partial class MainViewModel
         GuideBusy = true;
         await YieldUi();
 
+        await EnsureGuideWarmUpAsync();
         await BuildGuideAsync();
         GuideBusy = false;
         GuideBuilt = true;
@@ -251,20 +308,29 @@ public sealed partial class MainViewModel
         Raise(nameof(GuideScrollIndex));
     }
 
-    /// <summary>定中心（起点 → 当前中心 → 上次选中 → 第一只）后交给核心层建图。</summary>
-    private async Task BuildGuideAsync(bool useStart = false)
+    /// <summary>定中心（起点 → 当前中心 → 上次选中 → 第一只），找不到返回 null。</summary>
+    private int? ResolveGuideCenter(bool useStart)
     {
-        if (_facade is null)
-        {
-            GuideSummary = "还没有数据：先在左侧「数据文件」区加载 data.csv。";
-            return;
-        }
+        if (_facade is null) return null;
 
         int? center = useStart ? _facade.ResolveName(StartText).Id : null;
         center ??= _guideCenterId;
         center ??= _lastDetailId;
         if (center is null || !_facade.HasDigimon(center.Value)) center = _facade.FirstId();
-        if (center is null || !_facade.HasDigimon(center.Value))
+        return center is not null && _facade.HasDigimon(center.Value) ? center : null;
+    }
+
+    /// <summary>定好中心后交给核心层建图。</summary>
+    private async Task BuildGuideAsync(bool useStart = false)
+    {
+        if (_facade is null)
+        {
+            GuideSummary = "还没有数据：找不到可用的 data.csv。";
+            return;
+        }
+
+        var center = ResolveGuideCenter(useStart);
+        if (center is null)
         {
             GuideSummary = "找不到可以当中心的数码兽。";
             return;
@@ -350,7 +416,7 @@ public sealed partial class MainViewModel
     {
         if (_facade is null)
         {
-            ShowStatus("数据尚未加载，请先点「重新加载数据」。", ResourceKeys.ErrorColor);
+            ShowStatus("数据尚未加载：找不到可用的 data.csv。", ResourceKeys.ErrorColor);
             return;
         }
 
@@ -421,21 +487,6 @@ public sealed partial class MainViewModel
         }
     }
 
-    private void BrowseAssets()
-    {
-        var picked = _dialogs.PickFolder("选择数码兽图片目录（{编号}.png）", AssetsDirectory.Trim());
-        if (picked is not null) AssetsDirectory = picked;
-    }
-
-    private void ChooseDataFile()
-    {
-        var picked = _dialogs.PickDataFile(_state.DataPath);
-        if (picked is null) return;
-        _state.DataPath = picked;
-        _state.Save();
-        _ = LoadAsync();
-    }
-
     private void Export()
     {
         if (TextOutput.Length == 0)
@@ -452,8 +503,6 @@ public sealed partial class MainViewModel
     public string StatusText { get => _statusText; private set => Set(ref _statusText, value ?? ""); }
     public string StatusKey { get => _statusKey; private set => Set(ref _statusKey, value); }
     public string EnvText { get => _envText; private set => Set(ref _envText, value ?? ""); }
-    public string DataStatus { get => _dataStatus; private set => Set(ref _dataStatus, value ?? ""); }
-    public string DataStatusKey { get => _dataStatusKey; private set => Set(ref _dataStatusKey, value); }
 
     public void ShowStatus(string text, string key = ResourceKeys.SubtleColor)
     {
@@ -466,7 +515,6 @@ public sealed partial class MainViewModel
     public async Task PrepareForCaptureAsync()
     {
         ShowStatus("正在加载数据…");
-        DataStatus = "正在读取 data.csv…";
         await LoadCoreAsync();
         if (_facade is null)
         {

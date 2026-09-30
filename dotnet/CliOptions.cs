@@ -24,6 +24,8 @@ public sealed class CliOptions
     public string? CodexFilter;
     public double? WindowWidth;
     public double? WindowHeight;
+    public double? ZoomPercent;
+    public bool Maximized;
 
     public const string HelpText = """
         数码兽进化路线规划器（WPF 界面）
@@ -36,8 +38,10 @@ public sealed class CliOptions
           --skill <技能名>    启动时预选继承技（可重复：--skill A --skill B）
           --k <n>             启动时预填路径条数
           --window 1600x1000  指定初始窗口尺寸
+          --maximized         启动时直接最大化
           --codex             截图时直接进「图鉴」模式
           --depth <1-4>       图鉴的展开深度（默认 2）
+          --zoom <百分比>     图鉴关系网的初始缩放（默认 100）
           --codex-filter <文本> 截图时预填图鉴左侧的筛选框
           --screenshot <png>  离屏渲染一张界面截图后退出（验收用）
           --cli <参数...>     无界面执行一次查询（参数写法同 planner.py）
@@ -103,6 +107,12 @@ public sealed class CliOptions
                     break;
                 case "--codex":
                     options.CodexMode = true;
+                    break;
+                case "--maximized":
+                    options.Maximized = true;
+                    break;
+                case "--zoom":
+                    if (double.TryParse(Next(), out var zoom)) options.ZoomPercent = zoom;
                     break;
                 case "--depth":
                     if (int.TryParse(Next(), out var depth)) options.CodexDepth = depth;

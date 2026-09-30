@@ -44,6 +44,9 @@ public sealed class CodexNodeVm
     public string Generation { get; init; } = "";
     public string IdText => "#" + Id;
 
+    /// <summary>卡片上那行「#18 · 成长期」（世代缺了就只留编号）；固定一行，卡片才等高。</summary>
+    public string MetaText => Generation.Length > 0 ? $"{IdText} · {Generation}" : IdText;
+
     /// <summary>距中心的层数（0 = 中心；负数在中心左侧）。</summary>
     public int Level { get; init; }
     public bool IsRoot { get; init; }
@@ -59,6 +62,13 @@ public sealed class CodexNodeVm
     public bool OnRoute { get; init; }
 
     public string Tip { get; init; } = "";
+
+    /// <summary>
+    /// 这个节点平时收成一条窄条（小头像 + 编号 + 名字）：第 3 级往后，以及最外那一层。
+    /// 那几层节点最多，全画成完整卡片会把一整层撑得极高。
+    /// 鼠标指上去时由 <c>CodexGraph</c> 在它**上面**盖一张完整卡片——只是浮层，不动任何布局。
+    /// </summary>
+    public bool IsCompactBase { get; init; }
 }
 
 /// <summary>图鉴里的一条连线（Nodes 里的下标）。</summary>

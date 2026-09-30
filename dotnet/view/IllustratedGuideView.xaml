@@ -9,60 +9,104 @@
 
   <!-- 图鉴：左＝图鉴列表（虚拟化瀑布流），中＝以中心数码兽展开的关系网（可缩放 / 可拖动）。 -->
   <UserControl.Resources>
-    <!-- 左侧列表里的一张卡片 -->
+    <!-- 左侧列表里的一张卡片。尺寸写死、名字固定占两行，所有卡片一样高，瀑布流才齐 -->
     <DataTemplate x:Key="GuideCard">
       <Button Style="{DynamicResource CardButton}"
               view:AttachedCommand.ClickCommand="{Binding DataContext.ActivateEntryCommand,
                                                   RelativeSource={RelativeSource AncestorType=UserControl}}"
               view:AttachedCommand.ClickParameter="{Binding Id}"
               ToolTip="{Binding Tip}">
-        <Border Width="104" Height="130" CornerRadius="10" Background="{DynamicResource PanelBrush}"
-                BorderBrush="{DynamicResource BorderBrush2}" BorderThickness="{Binding BorderWidth}"
-                SnapsToDevicePixels="True">
+        <Border Width="104" Height="138" CornerRadius="11" Background="{DynamicResource PanelBrush}"
+                BorderThickness="{Binding BorderWidth}" SnapsToDevicePixels="True">
           <Border.Style>
             <Style TargetType="Border">
+              <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}" />
               <Style.Triggers>
+                <!-- 当前图鉴中心：描边换成强调色 -->
                 <DataTrigger Binding="{Binding IsCenter}" Value="True">
                   <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </DataTrigger>
+                <!-- 悬停：柔和的投影 + 强调色描边 -->
+                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}"
+                             Value="True">
+                  <Setter Property="BorderBrush" Value="{DynamicResource AccentSoftBrush}" />
+                  <Setter Property="Effect">
+                    <Setter.Value>
+                      <DropShadowEffect BlurRadius="10" ShadowDepth="1" Opacity="0.20" Color="#334155" />
+                    </Setter.Value>
+                  </Setter>
                 </DataTrigger>
               </Style.Triggers>
             </Style>
           </Border.Style>
+
           <Grid>
             <Grid.Clip>
-              <RectangleGeometry Rect="0,0,102,600" RadiusX="9" RadiusY="9" />
+              <RectangleGeometry Rect="0,0,102,600" RadiusX="10" RadiusY="10" />
             </Grid.Clip>
             <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" />
-              <RowDefinition Height="Auto" />
+              <RowDefinition Height="3" />
               <RowDefinition Height="*" />
             </Grid.RowDefinitions>
-            <Border Grid.Row="0" Height="3" CornerRadius="9,9,0,0" Background="{DynamicResource AccentBrush}"
+
+            <!-- 中心标记：一条顶色条 -->
+            <Border Grid.Row="0" Background="{DynamicResource AccentBrush}"
                     Visibility="{Binding HasCenterMark, Converter={StaticResource BoolVisibility}}" />
-            <Grid Grid.Row="1" Height="74" Margin="8,7,8,0">
-              <Grid Visibility="{Binding HasImage, Converter={StaticResource BoolVisibility}, ConverterParameter=invert}">
-                <Rectangle RadiusX="8" RadiusY="8" Fill="{DynamicResource PlaceholderFillBrush}"
-                           Stroke="{DynamicResource PlaceholderBorderBrush}" StrokeThickness="1"
-                           StrokeDashArray="4 3" />
-                <TextBlock Text="?" FontSize="22" FontWeight="Bold"
-                           Foreground="{DynamicResource PlaceholderGlyphBrush}"
-                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+            <StackPanel Grid.Row="1" Margin="8,7,8,8">
+              <!-- 头像统一裁进圆角框：原图底色各不相同，裁圆之后风格才一致 -->
+              <Grid Height="64">
+                <Border CornerRadius="8" Background="{DynamicResource PlaceholderFillBrush}"
+                        BorderBrush="{DynamicResource PlaceholderBorderBrush}" BorderThickness="1">
+                  <Border.Clip>
+                    <RectangleGeometry Rect="0,0,86,64" RadiusX="7" RadiusY="7" />
+                  </Border.Clip>
+                  <Grid>
+                    <TextBlock Text="?" FontSize="20" FontWeight="Bold"
+                               Foreground="{DynamicResource PlaceholderGlyphBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Image Source="{Binding Image}" Stretch="Uniform" Margin="3"
+                           Visibility="{Binding HasImage, Converter={StaticResource BoolVisibility}}" />
+                  </Grid>
+                </Border>
               </Grid>
-              <Image Source="{Binding Image}" Stretch="Uniform"
-                     Visibility="{Binding HasImage, Converter={StaticResource BoolVisibility}}" />
-            </Grid>
-            <StackPanel Grid.Row="2" Margin="4,6,4,0">
+
+              <!-- 名字固定两行高：一行与两行的名字不会把编号顶得到处跑 -->
               <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
-                         TextAlignment="Center" TextWrapping="Wrap" MaxHeight="30" />
+                         TextAlignment="Center" TextWrapping="Wrap"
+                         Height="32" Margin="0,6,0,0" VerticalAlignment="Top" />
+
               <TextBlock Text="{Binding IdText}" FontSize="10.5" Foreground="{DynamicResource FaintBrush}"
-                         TextAlignment="Center" Margin="0,2,0,0" />
+                         TextAlignment="Center" Margin="0,3,0,0" />
             </StackPanel>
           </Grid>
         </Border>
       </Button>
     </DataTemplate>
 
-    <!-- 关系网里的一个节点：单击看详情、双击换中心（由 view:AttachedCommand 接到命令上） -->
+
+    <!-- 关系网节点卡共用的边框 / 悬停反馈（完整卡片与窄条都用它） -->
+    <Style x:Key="CodexNodeFrame" TargetType="Border">
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+      <Setter Property="BorderThickness" Value="{Binding BorderWidth}" />
+      <Setter Property="BorderBrush" Value="{Binding BorderKey, Converter={StaticResource BrushKey}}" />
+      <Setter Property="SnapsToDevicePixels" Value="True" />
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}"
+                     Value="True">
+          <Setter Property="BorderBrush" Value="{DynamicResource AccentSoftBrush}" />
+          <Setter Property="Effect">
+            <Setter.Value>
+              <DropShadowEffect BlurRadius="12" ShadowDepth="1" Opacity="0.22" Color="#334155" />
+            </Setter.Value>
+          </Setter>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+
+    <!-- 关系网里的一个节点（完整卡片，210×66）：单击看详情、双击换中心。
+         尺寸要和 CodexGraph 里的 NodeWidth / FullNodeHeight 一致。 -->
     <DataTemplate x:Key="CodexNode">
       <Button Style="{DynamicResource CardButton}"
               view:AttachedCommand.ClickCommand="{Binding DataContext.ActivateNodeCommand,
@@ -72,51 +116,122 @@
                                                         RelativeSource={RelativeSource AncestorType=UserControl}}"
               view:AttachedCommand.DoubleClickParameter="{Binding Id}"
               ToolTip="{Binding Tip}">
-        <Border Width="124" CornerRadius="10" Background="{DynamicResource PanelBrush}"
-                BorderBrush="{Binding BorderKey, Converter={StaticResource BrushKey}}"
-                BorderThickness="{Binding BorderWidth}" SnapsToDevicePixels="True">
+        <Border Width="210" Height="66" Style="{StaticResource CodexNodeFrame}">
           <Grid>
             <Grid.Clip>
-              <RectangleGeometry Rect="0,0,122,2000" RadiusX="9" RadiusY="9" />
+              <RectangleGeometry Rect="0,0,208,600" RadiusX="9" RadiusY="9" />
             </Grid.Clip>
             <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" />
-              <RowDefinition Height="Auto" />
+              <RowDefinition Height="3" />
+              <RowDefinition Height="*" />
             </Grid.RowDefinitions>
-            <Border Grid.Row="0" Height="3" CornerRadius="10,10,0,0" Background="{DynamicResource AccentBrush}"
+
+            <!-- 中心标记：一条顶色条（非中心留空，保证所有卡片等高） -->
+            <Border Grid.Row="0" Background="{DynamicResource AccentBrush}"
                     Visibility="{Binding IsRoot, Converter={StaticResource BoolVisibility}}" />
-            <StackPanel Grid.Row="1" Margin="8,6,8,8">
-              <Grid Height="64">
-                <Grid Visibility="{Binding HasImage, Converter={StaticResource BoolVisibility}, ConverterParameter=invert}">
-                  <Rectangle RadiusX="8" RadiusY="8" Fill="{DynamicResource PlaceholderFillBrush}"
-                             Stroke="{DynamicResource PlaceholderBorderBrush}" StrokeThickness="1" StrokeDashArray="4 3" />
-                  <TextBlock Text="?" FontSize="22" FontWeight="Bold"
+
+            <Grid Grid.Row="1" Margin="8,6,8,6">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+
+              <!-- 头像统一裁进圆角框：原图底色各不相同，裁圆之后风格才一致 -->
+              <Border Grid.Column="0" Width="46" Height="46" CornerRadius="9"
+                      Background="{DynamicResource PlaceholderFillBrush}"
+                      BorderBrush="{DynamicResource PlaceholderBorderBrush}" BorderThickness="1">
+                <Border.Clip>
+                  <RectangleGeometry Rect="0,0,46,46" RadiusX="8" RadiusY="8" />
+                </Border.Clip>
+                <Grid>
+                  <TextBlock Text="?" FontSize="16" FontWeight="Bold"
                              Foreground="{DynamicResource PlaceholderGlyphBrush}"
                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <Image Source="{Binding Image}" Stretch="Uniform" Margin="2"
+                         Visibility="{Binding HasImage, Converter={StaticResource BoolVisibility}}" />
                 </Grid>
-                <Image Source="{Binding Image}" Stretch="Uniform"
-                       Visibility="{Binding HasImage, Converter={StaticResource BoolVisibility}}" />
+              </Border>
+
+              <Grid Grid.Column="1" Margin="8,0,0,0">
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="32" />
+                  <RowDefinition Height="14" />
+                </Grid.RowDefinitions>
+
+                <!-- 名字固定两行高（不省略号，长了就换行），在行内居中——只占一行的名字才不会贴着顶边 -->
+                <Grid Grid.Row="0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11.5" FontWeight="SemiBold"
+                             TextWrapping="Wrap" VerticalAlignment="Center" />
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
+                              Margin="4,0,0,0">
+                    <Border CornerRadius="7" Background="{DynamicResource AccentTintBrush}"
+                            BorderBrush="{DynamicResource AccentSoftBrush}" BorderThickness="1" Padding="4,0"
+                            Visibility="{Binding IsRoot, Converter={StaticResource BoolVisibility}}">
+                      <TextBlock Text="中心" FontSize="9.5" Foreground="{DynamicResource AccentBrush}" />
+                    </Border>
+                    <Border CornerRadius="7" Background="{DynamicResource ViaTintBrush}"
+                            BorderBrush="{DynamicResource ViaSoftBrush}" BorderThickness="1" Padding="4,0"
+                            Margin="3,0,0,0"
+                            Visibility="{Binding OnRoute, Converter={StaticResource BoolVisibility}}">
+                      <TextBlock Text="路线" FontSize="9.5" Foreground="{DynamicResource ViaBrush}" />
+                    </Border>
+                  </StackPanel>
+                </Grid>
+
+                <TextBlock Grid.Row="1" Text="{Binding MetaText}" FontSize="10.5"
+                           Foreground="{DynamicResource FaintBrush}" VerticalAlignment="Top" />
               </Grid>
-              <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" TextAlignment="Center"
-                         TextWrapping="Wrap" MaxHeight="32" Margin="0,6,0,0" />
-              <TextBlock Text="{Binding Generation}" FontSize="10.5" Foreground="{DynamicResource SubtleBrush}"
-                         TextAlignment="Center" Margin="0,1,0,0" />
-              <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
-                <TextBlock Text="{Binding IdText}" FontSize="10" Foreground="{DynamicResource FaintBrush}"
-                           VerticalAlignment="Center" />
-                <Border CornerRadius="7" Background="{DynamicResource AccentTintBrush}"
-                        BorderBrush="{DynamicResource AccentSoftBrush}" BorderThickness="1"
-                        Padding="5,1" Margin="4,0,0,0"
-                        Visibility="{Binding IsRoot, Converter={StaticResource BoolVisibility}}">
-                  <TextBlock Text="中心" FontSize="10" Foreground="{DynamicResource AccentBrush}" />
-                </Border>
-                <Border CornerRadius="7" Background="{DynamicResource ViaTintBrush}"
-                        BorderBrush="{DynamicResource ViaSoftBrush}" BorderThickness="1"
-                        Padding="5,1" Margin="4,0,0,0"
-                        Visibility="{Binding OnRoute, Converter={StaticResource BoolVisibility}}">
-                  <TextBlock Text="路线" FontSize="10" Foreground="{DynamicResource ViaBrush}" />
-                </Border>
-              </StackPanel>
+            </Grid>
+          </Grid>
+        </Border>
+      </Button>
+    </DataTemplate>
+
+    <!-- 收窄条的那些节点（210×34）：小头像 + 编号 + 名字，一眼能认出是谁。
+         鼠标指上去时 CodexGraph 会在它上面盖一张完整卡片——只是浮层，不动布局。 -->
+    <DataTemplate x:Key="CodexNodeCompact">
+      <Button Style="{DynamicResource CardButton}"
+              view:AttachedCommand.ClickCommand="{Binding DataContext.ActivateNodeCommand,
+                                                  RelativeSource={RelativeSource AncestorType=UserControl}}"
+              view:AttachedCommand.ClickParameter="{Binding Id}"
+              view:AttachedCommand.DoubleClickCommand="{Binding DataContext.ActivateNodeDoubleCommand,
+                                                        RelativeSource={RelativeSource AncestorType=UserControl}}"
+              view:AttachedCommand.DoubleClickParameter="{Binding Id}"
+              ToolTip="{Binding Tip}">
+        <Border Width="210" Height="34" Style="{StaticResource CodexNodeFrame}">
+          <Grid>
+            <Grid.Clip>
+              <RectangleGeometry Rect="0,0,208,600" RadiusX="9" RadiusY="9" />
+            </Grid.Clip>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="9,0,9,0">
+              <Border Width="22" Height="22" CornerRadius="6"
+                      Background="{DynamicResource PlaceholderFillBrush}"
+                      BorderBrush="{DynamicResource PlaceholderBorderBrush}" BorderThickness="1">
+                <Border.Clip>
+                  <RectangleGeometry Rect="0,0,22,22" RadiusX="5" RadiusY="5" />
+                </Border.Clip>
+                <Grid>
+                  <TextBlock Text="?" FontSize="11" FontWeight="Bold"
+                             Foreground="{DynamicResource PlaceholderGlyphBrush}"
+                             HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <Image Source="{Binding Image}" Stretch="Uniform" Margin="1"
+                         Visibility="{Binding HasImage, Converter={StaticResource BoolVisibility}}" />
+                </Grid>
+              </Border>
+              <TextBlock Text="{Binding IdText}" FontSize="10.5" Foreground="{DynamicResource FaintBrush}"
+                         VerticalAlignment="Center" Margin="7,0,0,0" />
+              <TextBlock Text="{Binding Name}" FontSize="10.5" FontWeight="SemiBold"
+                         VerticalAlignment="Center" Margin="7,0,0,0" />
+              <Border CornerRadius="7" Background="{DynamicResource ViaTintBrush}"
+                      BorderBrush="{DynamicResource ViaSoftBrush}" BorderThickness="1" Padding="3,0"
+                      Margin="7,0,0,0" VerticalAlignment="Center"
+                      Visibility="{Binding OnRoute, Converter={StaticResource BoolVisibility}}">
+                <TextBlock Text="路线" FontSize="9.5" Foreground="{DynamicResource ViaBrush}" />
+              </Border>
             </StackPanel>
           </Grid>
         </Border>
@@ -210,9 +325,10 @@
 
       <!-- 关系网宿主：内部滚动 + 缩放 + 拖动平移，中心节点自动居中 -->
       <view:CodexGraphHost Grid.Row="1" Graph="{Binding GuideGraph}" NodeTemplate="{StaticResource CodexNode}"
+                           CompactTemplate="{StaticResource CodexNodeCompact}"
                            Zoom="{Binding Zoom, Mode=TwoWay}" Background="Transparent" />
 
-      <!-- 首次进来要读缩略图 + 建关系网，先盖一层，免得看着像卡死 -->
+      <!-- 图鉴在启动时就已在后台加载（进度在状态栏右下角）；万一还没好，这里盖一层等它 -->
       <Border Grid.Row="0" Grid.RowSpan="2" Background="#CCF4F6F8"
               Visibility="{Binding GuideBusy, Converter={StaticResource BoolVisibility}}">
         <Border CornerRadius="10" Background="{DynamicResource PanelBrush}"
@@ -220,7 +336,7 @@
                 Padding="26,18" HorizontalAlignment="Center" VerticalAlignment="Center">
           <StackPanel>
             <TextBlock Text="{Binding GuideBusyText}" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" />
-            <TextBlock Text="首次进入要读图片缩略图并生成关系网，之后会快很多"
+            <TextBlock Text="图鉴在启动时就已经开始后台加载了，这里通常一闪而过"
                        Style="{DynamicResource HintText}" TextAlignment="Center" Margin="0,7,0,0" />
           </StackPanel>
         </Border>

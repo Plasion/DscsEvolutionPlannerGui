@@ -17,31 +17,43 @@ public sealed class ImageStore
     private readonly Dictionary<int, BitmapSource?> _cache = new();
     private readonly Dictionary<int, BitmapSource?> _thumbCache = new();
 
+    /// <summary>缩略图既会在后台预热（启动时的异步图鉴加载）里取，也会在界面上取，缓存要加锁。</summary>
+    private readonly object _gate = new();
+
     /// <summary>界面上可配置的目录（空则只用默认查找路径）。</summary>
     public string Directory { get; set; } = "";
 
     public void Clear()
     {
-        _cache.Clear();
-        _thumbCache.Clear();
+        lock (_gate)
+        {
+            _cache.Clear();
+            _thumbCache.Clear();
+        }
     }
 
     public BitmapSource? Get(int id, string name)
     {
-        if (_cache.TryGetValue(id, out var cached)) return cached;
-        var image = TryLoad(id, name, 0);
-        _cache[id] = image;
-        return image;
+        lock (_gate)
+        {
+            if (_cache.TryGetValue(id, out var cached)) return cached;
+            var image = TryLoad(id, name, 0);
+            _cache[id] = image;
+            return image;
+        }
     }
 
     /// <summary>缩略图（图鉴列表 / 关系网用）：按宽度解码，比原图快且省内存。宽度见 config.json。</summary>
     public BitmapSource? GetThumbnail(int id, string name, int decodeWidth = 0)
     {
         if (decodeWidth <= 0) decodeWidth = (int)AppSettings.Current().ThumbnailWidth;
-        if (_thumbCache.TryGetValue(id, out var cached)) return cached;
-        var image = TryLoad(id, name, decodeWidth);
-        _thumbCache[id] = image;
-        return image;
+        lock (_gate)
+        {
+            if (_thumbCache.TryGetValue(id, out var cached)) return cached;
+            var image = TryLoad(id, name, decodeWidth);
+            _thumbCache[id] = image;
+            return image;
+        }
     }
 
     private BitmapSource? TryLoad(int id, string name, int decodeWidth)

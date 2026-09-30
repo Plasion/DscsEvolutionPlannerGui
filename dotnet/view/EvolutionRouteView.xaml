@@ -9,14 +9,15 @@
 
   <!-- 进化线计算器：左＝查询参数，中＝算出的路线链（蛇形排布，可切文本视图）。 -->
   <UserControl.Resources>
-    <!-- 路线里的一张卡片：位置与箭头由 view:RouteChain 算，这里只有外观与内容 -->
+    <!-- 路线里的一张卡片：位置与箭头由 view:RouteChain 算，这里只有外观与内容。
+         横向条，和图鉴关系网的节点卡是同一套语言（头像在左、名字与「#编号 · 世代」在右）。 -->
     <DataTemplate x:Key="RouteCard">
       <Button Style="{DynamicResource CardButton}"
               view:AttachedCommand.ClickCommand="{Binding DataContext.SelectStepCommand,
                                                   RelativeSource={RelativeSource AncestorType=UserControl}}"
               view:AttachedCommand.ClickParameter="{Binding Id}"
               ToolTip="点击查看详情">
-        <Border Width="132" CornerRadius="12" Background="White"
+        <Border Width="208" Height="78" CornerRadius="10" Background="White"
                 BorderBrush="{DynamicResource BorderBrush2}" BorderThickness="1"
                 SnapsToDevicePixels="True">
           <Border.Style>
@@ -25,87 +26,105 @@
                 <Trigger Property="IsMouseOver" Value="True">
                   <Setter Property="BorderBrush" Value="{DynamicResource AccentSoftBrush}" />
                   <Setter Property="Background" Value="#FCFDFF" />
+                  <Setter Property="Effect">
+                    <Setter.Value>
+                      <DropShadowEffect BlurRadius="12" ShadowDepth="1" Opacity="0.20" Color="#334155" />
+                    </Setter.Value>
+                  </Setter>
                 </Trigger>
               </Style.Triggers>
             </Style>
           </Border.Style>
-          <Grid>
-            <!-- 把内容按圆角剪一下：不剪的话顶上那条起/终色条会从圆角处支棱出去 -->
-            <Grid.Clip>
-              <RectangleGeometry Rect="0,0,130,2000" RadiusX="11" RadiusY="11" />
-            </Grid.Clip>
-            <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" />
-              <RowDefinition Height="Auto" />
-              <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Height="3" CornerRadius="12,12,0,0"
-                    Background="{Binding RoleBarKey, Converter={StaticResource BrushKey}}"
+          <Grid>
+            <!-- 把内容按圆角剪一下：不剪的话左边那条起/终色条会从圆角处支棱出去 -->
+            <Grid.Clip>
+              <RectangleGeometry Rect="0,0,206,600" RadiusX="9" RadiusY="9" />
+            </Grid.Clip>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="4" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- 起 / 终 / 途：一条左侧色条 -->
+            <Border Grid.Column="0" Background="{Binding RoleBarKey, Converter={StaticResource BrushKey}}"
                     Visibility="{Binding HasRoleBar, Converter={StaticResource BoolVisibility}}" />
 
-            <Grid Grid.Row="1" Margin="10,8,10,0">
-              <TextBlock Text="{Binding IdText}" FontSize="10.5" FontWeight="SemiBold"
-                         Foreground="{DynamicResource FaintBrush}" HorizontalAlignment="Left" />
-              <ItemsControl ItemsSource="{Binding Badges}" HorizontalAlignment="Right">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <StackPanel Orientation="Horizontal" />
-                  </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate>
-                    <Border CornerRadius="8" Padding="6,1" Margin="3,0,0,0" BorderThickness="1"
-                            Background="{Binding Key, Converter={StaticResource RoleTint}}"
-                            BorderBrush="{Binding Key, Converter={StaticResource RoleBorder}}">
-                      <TextBlock Text="{Binding Text}" Style="{DynamicResource PillText}"
-                                 Foreground="{Binding Key, Converter={StaticResource BrushKey}}" />
-                    </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </Grid>
-
-            <StackPanel Grid.Row="2" Margin="0,4,0,10">
-              <Grid Width="112" Height="112" HorizontalAlignment="Center">
-                <Grid Visibility="{Binding HasImage, Converter={StaticResource BoolVisibility}, ConverterParameter=invert}">
-                  <Rectangle RadiusX="9" RadiusY="9" Fill="{DynamicResource PlaceholderFillBrush}"
-                             Stroke="{DynamicResource PlaceholderBorderBrush}" StrokeThickness="1"
-                             StrokeDashArray="4 3" />
-                  <TextBlock Text="?" FontSize="34" FontWeight="Bold"
-                             Foreground="{DynamicResource PlaceholderGlyphBrush}"
-                             HorizontalAlignment="Center" VerticalAlignment="Center" />
-                  <TextBlock Text="图片待补" FontSize="9.5" Foreground="{DynamicResource FaintBrush}"
-                             HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,7" />
-                </Grid>
-                <Image Source="{Binding Image}" Stretch="Uniform"
+            <!-- 头像统一裁进圆角框 -->
+            <Border Grid.Column="1" Width="46" Height="46" CornerRadius="9" Margin="7,0,0,0"
+                    Background="{DynamicResource PlaceholderFillBrush}"
+                    BorderBrush="{DynamicResource PlaceholderBorderBrush}" BorderThickness="1">
+              <Border.Clip>
+                <RectangleGeometry Rect="0,0,46,46" RadiusX="8" RadiusY="8" />
+              </Border.Clip>
+              <Grid>
+                <TextBlock Text="?" FontSize="16" FontWeight="Bold"
+                           Foreground="{DynamicResource PlaceholderGlyphBrush}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Image Source="{Binding Image}" Stretch="Uniform" Margin="2"
                        Visibility="{Binding HasImage, Converter={StaticResource BoolVisibility}}" />
               </Grid>
-              <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="SemiBold"
-                         TextAlignment="Center" TextWrapping="Wrap" MaxHeight="34" Margin="8,8,8,0" />
-              <TextBlock Text="{Binding Generation}" FontSize="11"
-                         Foreground="{DynamicResource SubtleBrush}" TextAlignment="Center" Margin="8,2,8,0" />
+            </Border>
 
-              <!-- 这只数码兽能提供的、本次查询里选中的继承技（技能名 + 学会等级） -->
-              <ItemsControl ItemsSource="{Binding Skills}" Margin="4,0,4,2"
+            <Grid Grid.Column="2" Margin="8,6,8,6">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="32" />
+                <RowDefinition Height="14" />
+                <RowDefinition Height="18" />
+              </Grid.RowDefinitions>
+
+              <!-- 名字固定两行高（不省略号，长了就换行），在行内居中——只占一行的名字才不会贴着顶边 -->
+              <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11.5" FontWeight="SemiBold"
+                           TextWrapping="Wrap" VerticalAlignment="Center" />
+                <ItemsControl Grid.Column="1" ItemsSource="{Binding Badges}" VerticalAlignment="Center"
+                              Margin="4,0,0,0">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border CornerRadius="7" Padding="5,0" Margin="3,0,0,0" BorderThickness="1"
+                              Background="{Binding Key, Converter={StaticResource RoleTint}}"
+                              BorderBrush="{Binding Key, Converter={StaticResource RoleBorder}}">
+                        <TextBlock Text="{Binding Text}" Style="{DynamicResource PillText}"
+                                   Foreground="{Binding Key, Converter={StaticResource BrushKey}}" />
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Grid>
+
+              <TextBlock Grid.Row="1" Text="{Binding MetaText}" FontSize="10.5"
+                         Foreground="{DynamicResource FaintBrush}" VerticalAlignment="Top" />
+
+              <!-- 这一只提供的继承技：只占一行，多了就裁掉（整条路线的汇总在标题下面那行） -->
+              <ItemsControl Grid.Row="2" ItemsSource="{Binding Skills}" ClipToBounds="True"
                             Visibility="{Binding HasSkills, Converter={StaticResource BoolVisibility}}">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center" />
+                    <WrapPanel Orientation="Horizontal" />
                   </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
                     <Border CornerRadius="7" Background="{DynamicResource ViaTintBrush}"
                             BorderBrush="{DynamicResource ViaSoftBrush}" BorderThickness="1"
-                            Padding="5,1" Margin="2,4,2,0" ToolTip="{Binding Tip}">
+                            Padding="5,0" Margin="0,2,4,0" ToolTip="{Binding Tip}">
                       <TextBlock Text="{Binding Text}" FontSize="10"
                                  Foreground="{DynamicResource ViaBrush}" VerticalAlignment="Center" />
                     </Border>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-            </StackPanel>
+            </Grid>
           </Grid>
         </Border>
       </Button>
@@ -119,20 +138,29 @@
       <ColumnDefinition Width="*" MinWidth="320" />
     </Grid.ColumnDefinitions>
 
-    <!-- ===================== 左：查询参数 ===================== -->
+    <!-- ===================== 左：查询参数（下面固定一条操作栏，参数区自己滚） ===================== -->
     <Border Grid.Column="0" Background="{DynamicResource PanelBrush}"
             BorderBrush="{DynamicResource BorderBrush2}" BorderThickness="0,0,1,0">
-      <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16,4,12,14">
-        <StackPanel>
-          <TextBlock Text="起终点" Style="{DynamicResource SectionText}" Margin="0,10,0,4" />
-          <TextBlock Text="起点数码兽（名字 / 别名 / 编号，支持拼音模糊匹配）" Style="{DynamicResource CaptionText}" Margin="0,0,0,3" />
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Padding="16,2,12,14">
+          <StackPanel>
+
+          <!-- ===== 起终点 ===== -->
+          <TextBlock Text="起终点" Style="{DynamicResource SectionText}" Margin="0,10,0,6" />
+          <TextBlock Text="起点数码兽（名字 / 别名 / 编号，支持拼音模糊匹配）"
+                     Style="{DynamicResource CaptionText}" Margin="0,0,0,4" />
           <view:SuggestBox Height="32" FontSize="13" Text="{Binding StartText, Mode=TwoWay}"
                            SuggestionProvider="{Binding SuggestStart}" />
           <TextBlock Text="{Binding StartHint}" Style="{DynamicResource HintText}"
                      Foreground="{Binding StartHintKey, Converter={StaticResource BrushKey}}" />
 
           <TextBlock Text="终点模式" Style="{DynamicResource CaptionText}" />
-          <StackPanel Orientation="Horizontal">
+          <StackPanel Orientation="Horizontal" Margin="0,1,0,2">
             <RadioButton Content="指定终点" IsChecked="{Binding ModeSingle}" Margin="0,0,14,0" />
             <RadioButton Content="多终点" IsChecked="{Binding ModeMulti}" Margin="0,0,14,0" />
             <RadioButton Content="任意终点" IsChecked="{Binding ModeAny}" />
@@ -148,24 +176,28 @@
 
           <TextBox Text="{Binding MultiEndText, UpdateSourceTrigger=PropertyChanged}" Height="54"
                    AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top"
-                   IsEnabled="{Binding IsMultiEndEnabled}" Margin="0,6,0,0" />
+                   IsEnabled="{Binding IsMultiEndEnabled}" Margin="0,7,0,0" />
 
-          <TextBlock Text="途经数码兽（每行一组：组内任一即可，组之间都要满足）" Style="{DynamicResource CaptionText}" />
-          <TextBox Text="{Binding ViaText, UpdateSourceTrigger=PropertyChanged}" Height="58"
+          <!-- ===== 约束 ===== -->
+          <TextBlock Text="途经数码兽" Style="{DynamicResource SectionText}" />
+          <TextBlock Text="每行一组：组内任一即可，组之间都要满足"
+                     Style="{DynamicResource CaptionText}" Margin="0,0,0,4" />
+          <TextBox Text="{Binding ViaText, UpdateSourceTrigger=PropertyChanged}" Height="54"
                    AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top"
                    VerticalScrollBarVisibility="Auto" />
 
-          <TextBlock Text="需沿途收集的继承技（点开多选，可关键字筛选）" Style="{DynamicResource CaptionText}" />
-                    <view:SkillPicker Margin="0,1,0,0"
-                            Summary="{Binding SkillSummary}"
-                            ItemsSource="{Binding VisibleSkills}"
-                            FilterText="{Binding SkillFilter, Mode=TwoWay}"
-                            SelectAllCommand="{Binding SelectAllVisibleSkillsCommand}"
-                            ClearCommand="{Binding ClearSkillsCommand}" />
+          <TextBlock Text="需沿途收集的继承技" Style="{DynamicResource SectionText}" />
+          <TextBlock Text="点开多选，可关键字筛选" Style="{DynamicResource CaptionText}" Margin="0,0,0,4" />
+          <view:SkillPicker
+                  Summary="{Binding SkillSummary}"
+                  ItemsSource="{Binding VisibleSkills}"
+                  FilterText="{Binding SkillFilter, Mode=TwoWay}"
+                  SelectAllCommand="{Binding SelectAllVisibleSkillsCommand}"
+                  ClearCommand="{Binding ClearSkillsCommand}" />
 
-          <TextBlock Text="排除世代" Style="{DynamicResource CaptionText}" />
+          <TextBlock Text="排除世代" Style="{DynamicResource SectionText}" />
           <Border BorderBrush="{DynamicResource BorderBrush2}" BorderThickness="1" CornerRadius="6"
-                  Height="116" Margin="0,1,0,0">
+                  Height="108">
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8,6">
               <ItemsControl ItemsSource="{Binding Generations}">
                 <ItemsControl.ItemTemplate>
@@ -177,50 +209,52 @@
             </ScrollViewer>
           </Border>
 
-          <Grid Margin="0,12,0,0">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-              <TextBlock Text="路径条数" FontSize="12.5" Foreground="{DynamicResource SubtleBrush}" VerticalAlignment="Center" />
-              <TextBox Width="58" Height="28" Margin="8,0,0,0" TextAlignment="Center"
-                       Text="{Binding K, UpdateSourceTrigger=LostFocus}" />
-              <CheckBox Content="翻转显示" IsChecked="{Binding Reverse}" Margin="18,0,0,0" VerticalAlignment="Center" />
-            </StackPanel>
-          </Grid>
+          <!-- ===== 选项 ===== -->
+          <Border Height="1" Background="{DynamicResource GridBrush}" Margin="0,14,0,12" />
 
-          <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-            <Button Content="计算路线" Style="{DynamicResource PrimaryButton}" Width="104"
-                    Command="{Binding RunCommand}" />
-            <Button Content="{Binding ViewButtonText}" Style="{DynamicResource SecondaryButton}" Width="84"
-                    Margin="8,0,0,0" Command="{Binding ToggleTextViewCommand}" />
-            <Button Content="导出" Style="{DynamicResource SecondaryButton}" Width="58"
-                    Margin="8,0,0,0" Command="{Binding ExportCommand}" />
-            <Button Content="重置" Style="{DynamicResource GhostButton}" Width="58"
-                    Margin="4,0,0,0" Command="{Binding ResetCommand}" />
-          </StackPanel>
-
-          <TextBlock Text="图片目录" Style="{DynamicResource SectionText}" />
           <Grid>
             <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
               <ColumnDefinition Width="*" />
               <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <TextBox Height="28" FontSize="12" Text="{Binding AssetsDirectory, UpdateSourceTrigger=PropertyChanged}" />
-            <Button Grid.Column="1" Content="浏览…" Style="{DynamicResource GhostButton}" Width="66"
-                    Margin="6,0,0,0" Command="{Binding BrowseAssetsCommand}" />
+            <TextBlock Grid.Column="0" Text="路径条数" FontSize="12.5"
+                       Foreground="{DynamicResource SubtleBrush}" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" Height="30" Margin="8,0,10,0" TextAlignment="Center"
+                     Text="{Binding K, UpdateSourceTrigger=LostFocus}" />
+            <CheckBox Grid.Column="2" Content="翻转显示" IsChecked="{Binding Reverse}"
+                      VerticalAlignment="Center" />
           </Grid>
-          <TextBlock Text="图片暂时空着：把 {编号}.png 放进该目录即可自动显示；卡片上会画虚线占位框。"
-                     Style="{DynamicResource HintText}" />
 
-          <TextBlock Text="数据文件" Style="{DynamicResource SectionText}" />
-          <StackPanel Orientation="Horizontal">
-            <Button Content="重新加载数据" Style="{DynamicResource SecondaryButton}" Width="140"
-                    HorizontalAlignment="Left" Command="{Binding ReloadDataCommand}" />
-            <Button Content="选择文件…" Style="{DynamicResource GhostButton}" Width="86" Margin="8,2,0,0"
-                    Command="{Binding ChooseDataFileCommand}" />
           </StackPanel>
-                    <TextBlock Text="{Binding DataStatus}" Style="{DynamicResource HintText}" Margin="1,7,0,0"
-                     Foreground="{Binding DataStatusKey, Converter={StaticResource BrushKey}}" />
-         </StackPanel>
-      </ScrollViewer>
+        </ScrollViewer>
+
+        <!-- ===== 操作栏：固定在下沿，不用滚到底才能点「计算路线」 ===== -->
+        <Border Grid.Row="1" Background="{DynamicResource PanelBrush}"
+                BorderBrush="{DynamicResource BorderBrush2}" BorderThickness="0,1,0,0"
+                Padding="16,11,12,13">
+          <StackPanel>
+            <!-- 主操作：占满整行、比下面那排高一档 -->
+            <Button Content="计算路线" Style="{DynamicResource PrimaryButton}" Height="44" FontSize="15"
+                    Command="{Binding RunCommand}" />
+
+            <!-- 次要操作：三等分一行 -->
+            <Grid Margin="0,8,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Button Grid.Column="0" Height="34" Content="{Binding ViewButtonText}"
+                      Style="{DynamicResource SecondaryButton}" Command="{Binding ToggleTextViewCommand}" />
+              <Button Grid.Column="1" Height="34" Content="导出" Margin="8,0,0,0"
+                      Style="{DynamicResource SecondaryButton}" Command="{Binding ExportCommand}" />
+              <Button Grid.Column="2" Height="34" Content="重置" Margin="8,0,0,0"
+                      Style="{DynamicResource GhostButton}" Command="{Binding ResetCommand}" />
+            </Grid>
+          </StackPanel>
+        </Border>
+      </Grid>
     </Border>
 
     <!-- ===================== 中：路线 / 文本视图 ===================== -->

@@ -56,18 +56,16 @@ public sealed partial class MainViewModel : NotifyBase
 
         for (var depth = 1; depth <= settings.MaxDepth; depth++) DepthChoices.Add(depth);
         CodexDepth = settings.ClampDepth(settings.DefaultDepth);
+        if (startup.ZoomPercent is { } zoomPercent) Zoom = zoomPercent / 100.0;
 
         MinimizeCommand = new Command(() => WindowActions?.Minimize());
         MaximizeCommand = new Command(() => WindowActions?.ToggleMaximize());
         CloseCommand = new Command(() => WindowActions?.Close());
 
         RunCommand = new Command(() => _ = RunAsync(), () => !_loading);
-        ReloadDataCommand = new Command(() => _ = LoadAsync(), () => !_loading);
         ResetCommand = new Command(Reset);
         ToggleTextViewCommand = new Command(ToggleTextView);
         ExportCommand = new Command(Export);
-        BrowseAssetsCommand = new Command(BrowseAssets);
-        ChooseDataFileCommand = new Command(ChooseDataFile);
 
         SelectStepCommand = new Command<int>(ShowDetail);
         ShowRoutesCommand = new Command(() => IsGuideMode = false);
@@ -115,25 +113,18 @@ public sealed partial class MainViewModel : NotifyBase
         _state.Save();
     }
 
-    private void RefreshCommands()
-    {
-        RunCommand.RaiseCanExecuteChanged();
-        ReloadDataCommand.RaiseCanExecuteChanged();
-    }
+    private void RefreshCommands() => RunCommand.RaiseCanExecuteChanged();
 
-    /// <summary>让出一次 UI 优先级，好让遮罩先画出来。</summary>
+    /// <summary>让出一次 UI 优先级，好让遮罩 / 状态栏先画出来。</summary>
     private static Task YieldUi() =>
         Application.Current?.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Background).Task
         ?? Task.CompletedTask;
 
     // ============================ 命令 ============================
     public Command RunCommand { get; }
-    public Command ReloadDataCommand { get; }
     public Command ResetCommand { get; }
     public Command ToggleTextViewCommand { get; }
     public Command ExportCommand { get; }
-    public Command BrowseAssetsCommand { get; }
-    public Command ChooseDataFileCommand { get; }
     public Command MinimizeCommand { get; }
     public Command MaximizeCommand { get; }
     public Command CloseCommand { get; }

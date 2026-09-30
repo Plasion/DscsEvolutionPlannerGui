@@ -24,6 +24,8 @@ public static class AppBootstrapper
             DirectGuide = options.CodexMode,
             CodexDepth = options.CodexDepth,
             CodexFilter = options.CodexFilter,
+            ZoomPercent = options.ZoomPercent,
+            Maximized = options.Maximized,
         };
         return (startup, state);
     }

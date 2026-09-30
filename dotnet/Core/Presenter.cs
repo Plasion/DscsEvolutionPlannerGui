@@ -155,6 +155,12 @@ public sealed class RoutePresenter
 /// <summary>图鉴数据：筛选出的卡片列表、以某只为中心的关系网。</summary>
 public sealed class CodexPresenter
 {
+    /// <summary>从这一级开始才可能收成窄条（中心那圈直接邻居始终完整）。</summary>
+    private const int CompactFromLevel = 2;
+
+    /// <summary>这一层数量超过多少才值得收起来（少的时候收起来反而更难认）。</summary>
+    private const int CompactMinCount = 6;
+
     private readonly DigimonCatalog _catalog;
     private readonly IReadOnlyDictionary<int, Digimon> _digimons;
     private readonly ImageStore _images;
@@ -191,6 +197,21 @@ public sealed class CodexPresenter
 
         return source.Select(digimon => MakeEntry(digimon, centerId)).ToList();
     }
+
+    /// <summary>图鉴一共有多少只（异步预热时用来算进度）。</summary>
+    public int Count => _digimons.Count;
+
+    /// <summary>
+    /// 按编号顺序生成第 [start, start+count) 只的卡片，供启动时的异步预热分块调用
+    /// （一次建完会让状态栏的进度只有 0% 和 100% 两个值）。
+    /// </summary>
+    public List<CodexEntryVm> BuildEntryRange(int start, int count, int? centerId) =>
+        _digimons.Values
+            .OrderBy(digimon => digimon.Id)
+            .Skip(start)
+            .Take(count)
+            .Select(digimon => MakeEntry(digimon, centerId))
+            .ToList();
 
     /// <summary>
     /// 以 centerId 为中心按深度展开关系网。方向是单侧单方向的：右边只沿「进化」、
@@ -245,6 +266,22 @@ public sealed class CodexPresenter
         var indexOf = new Dictionary<int, int>();
         for (var i = 0; i < ordered.Count; i++) indexOf[ordered[i]] = i;
 
+        // 哪几个节点平时收成窄条：**第 2 级及以后，并且这一层数量 > 6**。
+        // 前一条保证中心那圈直接邻居始终完整；后一条保证只有真正挤的那几层才收
+        // （数量少的层收起来反而更难认）。
+        var perLevel = new Dictionary<int, int>();
+        foreach (var value in level.Values)
+        {
+            perLevel.TryGetValue(value, out var count);
+            perLevel[value] = count + 1;
+        }
+
+        bool IsCompact(int id)
+        {
+            var distance = level[id];
+            return Math.Abs(distance) >= CompactFromLevel && perLevel[distance] > CompactMinCount;
+        }
+
         var highlightNodes = new HashSet<int>();
         var highlightLinks = new HashSet<(int, int)>();
         if (highlightRoutes)
@@ -273,6 +310,7 @@ public sealed class CodexPresenter
                 Generation = digimon.DisplayGeneration,
                 Level = level[id],
                 IsRoot = isRoot,
+                IsCompactBase = IsCompact(id),
                 Image = _images.GetThumbnail(digimon.Id, digimon.Name),
                 OnRoute = highlightNodes.Contains(id),
                 BorderKey = isRoot ? ResourceKeys.AccentColor : ResourceKeys.BorderColor,

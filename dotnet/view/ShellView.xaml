@@ -214,14 +214,15 @@
       </Grid>
     </ControlTemplate>
 
-    <!-- 关系网宿主：内部滚动 + 缩放 + 拖动平移 -->
+    <!-- 关系网宿主：内部滚动 + 缩放 + 拖动平移。滚动条按需求隐藏（功能保留：拖动 / 滚轮 / Shift+滚轮） -->
     <ControlTemplate x:Key="CodexGraphHostTemplate" TargetType="{x:Type view:CodexGraphHost}">
       <ScrollViewer x:Name="PART_Scroll" Background="Transparent"
-                    HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"
                     PanningMode="None" Padding="10">
         <view:CodexGraph x:Name="PART_Graph"
                          Graph="{Binding Graph, RelativeSource={RelativeSource TemplatedParent}}"
                          NodeTemplate="{Binding NodeTemplate, RelativeSource={RelativeSource TemplatedParent}}"
+                         CompactTemplate="{Binding CompactTemplate, RelativeSource={RelativeSource TemplatedParent}}"
                          Background="Transparent" />
       </ScrollViewer>
     </ControlTemplate>
@@ -473,11 +474,22 @@
         <GridSplitter Grid.Column="1" Style="{DynamicResource ColumnSplitter}" />
       </Grid>
 
-      <!-- ======================== 状态栏 ======================== -->
+      <!-- ======================== 状态栏（右端是图鉴后台加载的静默进度） ======================== -->
       <Border Grid.Row="2" Background="{DynamicResource PanelBrush}"
               BorderBrush="{DynamicResource BorderBrush2}" BorderThickness="0,1,0,0">
-        <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusKey, Converter={StaticResource BrushKey}}"
-                   FontSize="11.5" VerticalAlignment="Center" Margin="18,0,14,0" TextTrimming="CharacterEllipsis" />
+        <Grid Margin="18,0,14,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0" Text="{Binding StatusText}"
+                     Foreground="{Binding StatusKey, Converter={StaticResource BrushKey}}"
+                     FontSize="11.5" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+          <TextBlock Grid.Column="1" Text="{Binding CodexLoadText}" FontSize="11.5" Margin="14,0,0,0"
+                     Foreground="{DynamicResource FaintBrush}" VerticalAlignment="Center"
+                     ToolTip="图鉴正在后台加载，不挡操作"
+                     Visibility="{Binding HasCodexLoad, Converter={StaticResource BoolVisibility}}" />
+        </Grid>
       </Border>
     </Grid>
   </Border>

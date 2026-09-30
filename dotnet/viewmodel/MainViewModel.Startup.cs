@@ -23,12 +23,10 @@ public sealed partial class MainViewModel
     private string _endHintKey = ResourceKeys.FaintColor;
 
     // ------------------------------------------------------------------ 启动
-    /// <summary>启动流程：读 data.csv → 刷新界面 → 预填 → 算一次。全程异步，界面不卡。</summary>
+    /// <summary>启动流程：读 data.csv → 刷新界面 → 预填 → 算一次 → 把图鉴挂到后台加载。全程异步，界面不卡。</summary>
     public async Task InitializeAsync()
     {
         ShowStatus("正在加载数据…");
-        DataStatus = "正在读取 data.csv…";
-        DataStatusKey = ResourceKeys.FaintColor;
         await LoadCoreAsync();
 
         if (_facade is null)
@@ -95,8 +93,6 @@ public sealed partial class MainViewModel
 
         var pinyin = facade.PinyinLoaded ? "内置拼音表" : "仅字符匹配（缺 Data/PinyinTable.json）";
         EnvText = $"{facade.DigimonCount} 只数码兽 · {pinyin}";
-        DataStatus = $"✓ 已加载 {facade.DigimonCount} 只数码兽（{pinyin}）\n{facade.DataPath}";
-        DataStatusKey = ResourceKeys.StartColor;
         DetailsHint = $"点击路线里的数码兽查看详情。图片目录：{AssetsDirectory}";
         SelectedDetail = null;
         ResetGuide();
@@ -106,6 +102,9 @@ public sealed partial class MainViewModel
             warnings.Add("警告：Data/PinyinTable.json 与 data.csv 不同源，拼音匹配可能不准");
         ShowStatus(warnings.Count > 0 ? string.Join(" ｜ ", warnings) : "数据已就绪。",
             warnings.Count > 0 ? ResourceKeys.WarnColor : ResourceKeys.SubtleColor);
+
+        // 数据一就绪就把图鉴挂到后台加载：不挡界面，进度只静默写在状态栏右下角
+        StartGuideWarmUp();
     }
 
     /// <summary>--skill 预选：名字与候选技能对齐后勾上。</summary>
@@ -123,32 +122,9 @@ public sealed partial class MainViewModel
     private void ShowDataError(string message)
     {
         ShowStatus(message.Split('\n')[0], ResourceKeys.ErrorColor);
-        DataStatus = "✗ " + message.Replace("\n", " ");
-        DataStatusKey = ResourceKeys.ErrorColor;
         EmptyHint = "加载数据失败：\n" + message;
         RefreshRegion();
         _dialogs.Warn("无法加载数据", message);
-    }
-
-    /// <summary>重新加载数据：读盘 + 重建索引，再算一次。</summary>
-    public async Task LoadAsync()
-    {
-        DataStatus = "正在读取 data.csv…";
-        DataStatusKey = ResourceKeys.FaintColor;
-        await LoadCoreAsync();
-
-        if (_facade is null)
-        {
-            ShowDataError(LastError ?? "加载数据失败");
-            return;
-        }
-
-        if (StartText.Trim().Length == 0 && EndText.Trim().Length == 0)
-        {
-            StartText = "亚古兽";
-            EndText = "战斗暴龙兽";
-        }
-        await RunAsync();
     }
 
     // ------------------------------------------------------------------ 查询表单
@@ -172,22 +148,43 @@ public sealed partial class MainViewModel
 
     public bool Reverse { get => _reverse; set => Set(ref _reverse, value); }
 
+    // 三个终点模式互斥，而且**不管变成真还是假都要刷新** IsEndEnabled / IsMultiEndEnabled。
+    //
+    // 原来只在「变成勾选」时刷新，于是点「指定终点」时：单选组先把 ModeSingle 置真（此刻
+    // ModeMulti 还是旧的 true，刷新出来的 IsMultiEndEnabled 仍是 true），紧接着把 ModeMulti
+    // 置假——而这一趟不发通知，多终点的输入框就一直停在启用状态。
+    // 这里另外自己把同组的另外两个清掉，不再依赖 WPF 单选组的回写时机。
     public bool ModeSingle
     {
         get => _modeSingle;
-        set { if (Set(ref _modeSingle, value) && value) RefreshMode(); }
+        set
+        {
+            if (!Set(ref _modeSingle, value)) return;
+            if (value) { ModeMulti = false; ModeAny = false; }
+            RefreshMode();
+        }
     }
 
     public bool ModeMulti
     {
         get => _modeMulti;
-        set { if (Set(ref _modeMulti, value) && value) RefreshMode(); }
+        set
+        {
+            if (!Set(ref _modeMulti, value)) return;
+            if (value) { ModeSingle = false; ModeAny = false; }
+            RefreshMode();
+        }
     }
 
     public bool ModeAny
     {
         get => _modeAny;
-        set { if (Set(ref _modeAny, value) && value) RefreshMode(); }
+        set
+        {
+            if (!Set(ref _modeAny, value)) return;
+            if (value) { ModeSingle = false; ModeMulti = false; }
+            RefreshMode();
+        }
     }
 
     public bool IsEndEnabled => _modeSingle;
