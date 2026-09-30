@@ -1,0 +1,232 @@
+<UserControl x:Class="DscsEvolutionPlanner.View.IllustratedGuideView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:view="clr-namespace:DscsEvolutionPlanner.View"
+             TextElement.Foreground="{DynamicResource TextBrush}"
+             TextElement.FontFamily="{DynamicResource UiFont}"
+             TextElement.FontSize="13"
+             UseLayoutRounding="True" SnapsToDevicePixels="True">
+
+  <!-- 图鉴：左＝图鉴列表（虚拟化瀑布流），中＝以中心数码兽展开的关系网（可缩放 / 可拖动）。 -->
+  <UserControl.Resources>
+    <!-- 左侧列表里的一张卡片 -->
+    <DataTemplate x:Key="GuideCard">
+      <Button Style="{DynamicResource CardButton}"
+              view:AttachedCommand.ClickCommand="{Binding DataContext.ActivateEntryCommand,
+                                                  RelativeSource={RelativeSource AncestorType=UserControl}}"
+              view:AttachedCommand.ClickParameter="{Binding Id}"
+              ToolTip="{Binding Tip}">
+        <Border Width="104" Height="130" CornerRadius="10" Background="{DynamicResource PanelBrush}"
+                BorderBrush="{DynamicResource BorderBrush2}" BorderThickness="{Binding BorderWidth}"
+                SnapsToDevicePixels="True">
+          <Border.Style>
+            <Style TargetType="Border">
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsCenter}" Value="True">
+                  <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </Border.Style>
+          <Grid>
+            <Grid.Clip>
+              <RectangleGeometry Rect="0,0,102,600" RadiusX="9" RadiusY="9" />
+            </Grid.Clip>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" Height="3" CornerRadius="9,9,0,0" Background="{DynamicResource AccentBrush}"
+                    Visibility="{Binding HasCenterMark, Converter={StaticResource BoolVisibility}}" />
+            <Grid Grid.Row="1" Height="74" Margin="8,7,8,0">
+              <Grid Visibility="{Binding HasImage, Converter={StaticResource BoolVisibility}, ConverterParameter=invert}">
+                <Rectangle RadiusX="8" RadiusY="8" Fill="{DynamicResource PlaceholderFillBrush}"
+                           Stroke="{DynamicResource PlaceholderBorderBrush}" StrokeThickness="1"
+                           StrokeDashArray="4 3" />
+                <TextBlock Text="?" FontSize="22" FontWeight="Bold"
+                           Foreground="{DynamicResource PlaceholderGlyphBrush}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Grid>
+              <Image Source="{Binding Image}" Stretch="Uniform"
+                     Visibility="{Binding HasImage, Converter={StaticResource BoolVisibility}}" />
+            </Grid>
+            <StackPanel Grid.Row="2" Margin="4,6,4,0">
+              <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
+                         TextAlignment="Center" TextWrapping="Wrap" MaxHeight="30" />
+              <TextBlock Text="{Binding IdText}" FontSize="10.5" Foreground="{DynamicResource FaintBrush}"
+                         TextAlignment="Center" Margin="0,2,0,0" />
+            </StackPanel>
+          </Grid>
+        </Border>
+      </Button>
+    </DataTemplate>
+
+    <!-- 关系网里的一个节点：单击看详情、双击换中心（由 view:AttachedCommand 接到命令上） -->
+    <DataTemplate x:Key="CodexNode">
+      <Button Style="{DynamicResource CardButton}"
+              view:AttachedCommand.ClickCommand="{Binding DataContext.ActivateNodeCommand,
+                                                  RelativeSource={RelativeSource AncestorType=UserControl}}"
+              view:AttachedCommand.ClickParameter="{Binding Id}"
+              view:AttachedCommand.DoubleClickCommand="{Binding DataContext.ActivateNodeDoubleCommand,
+                                                        RelativeSource={RelativeSource AncestorType=UserControl}}"
+              view:AttachedCommand.DoubleClickParameter="{Binding Id}"
+              ToolTip="{Binding Tip}">
+        <Border Width="124" CornerRadius="10" Background="{DynamicResource PanelBrush}"
+                BorderBrush="{Binding BorderKey, Converter={StaticResource BrushKey}}"
+                BorderThickness="{Binding BorderWidth}" SnapsToDevicePixels="True">
+          <Grid>
+            <Grid.Clip>
+              <RectangleGeometry Rect="0,0,122,2000" RadiusX="9" RadiusY="9" />
+            </Grid.Clip>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" Height="3" CornerRadius="10,10,0,0" Background="{DynamicResource AccentBrush}"
+                    Visibility="{Binding IsRoot, Converter={StaticResource BoolVisibility}}" />
+            <StackPanel Grid.Row="1" Margin="8,6,8,8">
+              <Grid Height="64">
+                <Grid Visibility="{Binding HasImage, Converter={StaticResource BoolVisibility}, ConverterParameter=invert}">
+                  <Rectangle RadiusX="8" RadiusY="8" Fill="{DynamicResource PlaceholderFillBrush}"
+                             Stroke="{DynamicResource PlaceholderBorderBrush}" StrokeThickness="1" StrokeDashArray="4 3" />
+                  <TextBlock Text="?" FontSize="22" FontWeight="Bold"
+                             Foreground="{DynamicResource PlaceholderGlyphBrush}"
+                             HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Grid>
+                <Image Source="{Binding Image}" Stretch="Uniform"
+                       Visibility="{Binding HasImage, Converter={StaticResource BoolVisibility}}" />
+              </Grid>
+              <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" TextAlignment="Center"
+                         TextWrapping="Wrap" MaxHeight="32" Margin="0,6,0,0" />
+              <TextBlock Text="{Binding Generation}" FontSize="10.5" Foreground="{DynamicResource SubtleBrush}"
+                         TextAlignment="Center" Margin="0,1,0,0" />
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
+                <TextBlock Text="{Binding IdText}" FontSize="10" Foreground="{DynamicResource FaintBrush}"
+                           VerticalAlignment="Center" />
+                <Border CornerRadius="7" Background="{DynamicResource AccentTintBrush}"
+                        BorderBrush="{DynamicResource AccentSoftBrush}" BorderThickness="1"
+                        Padding="5,1" Margin="4,0,0,0"
+                        Visibility="{Binding IsRoot, Converter={StaticResource BoolVisibility}}">
+                  <TextBlock Text="中心" FontSize="10" Foreground="{DynamicResource AccentBrush}" />
+                </Border>
+                <Border CornerRadius="7" Background="{DynamicResource ViaTintBrush}"
+                        BorderBrush="{DynamicResource ViaSoftBrush}" BorderThickness="1"
+                        Padding="5,1" Margin="4,0,0,0"
+                        Visibility="{Binding OnRoute, Converter={StaticResource BoolVisibility}}">
+                  <TextBlock Text="路线" FontSize="10" Foreground="{DynamicResource ViaBrush}" />
+                </Border>
+              </StackPanel>
+            </StackPanel>
+          </Grid>
+        </Border>
+      </Button>
+    </DataTemplate>
+  </UserControl.Resources>
+
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="{Binding LeftColumnWidth}" MinWidth="{Binding ColumnMinWidth}" />
+      <ColumnDefinition Width="6" />
+      <ColumnDefinition Width="*" MinWidth="320" />
+    </Grid.ColumnDefinitions>
+
+    <!-- ===================== 左：图鉴列表（关系网以选中的为中心） ===================== -->
+    <Border Grid.Column="0" Background="{DynamicResource PanelBrush}"
+            BorderBrush="{DynamicResource BorderBrush2}" BorderThickness="0,0,1,0">
+      <Grid Margin="16,12,10,12">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="图鉴列表" Style="{DynamicResource SectionText}" Margin="0,0,0,6" />
+        <StackPanel Grid.Row="1">
+          <TextBox Height="30" FontSize="12.5" Text="{Binding GuideFilter, UpdateSourceTrigger=PropertyChanged}"
+                   ToolTip="按名字 / 别名 / 编号 / 世代筛选，也支持拼音（yagushou）或错字" />
+          <TextBlock Text="{Binding GuideListStatus}" Style="{DynamicResource HintText}" Margin="1,5,0,7" />
+        </StackPanel>
+
+        <!-- 滚动的 ScrollViewer 放在模板里，面板的 IScrollInfo 才会被接上 -->
+        <ItemsControl Grid.Row="2" ItemsSource="{Binding GuideEntries}" ItemTemplate="{StaticResource GuideCard}">
+          <ItemsControl.Template>
+            <ControlTemplate TargetType="ItemsControl">
+              <ScrollViewer CanContentScroll="True" Focusable="False" Background="Transparent"
+                            HorizontalScrollBarVisibility="Disabled"
+                            VerticalScrollBarVisibility="Auto" Padding="0,2,2,2">
+                <ItemsPresenter />
+              </ScrollViewer>
+            </ControlTemplate>
+          </ItemsControl.Template>
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <!-- 虚拟化瀑布流：只生成视口内的卡片；ScrollToIndex 让中心卡自动滚进视口 -->
+              <view:VirtualizingMasonryPanel ScrollToIndex="{Binding GuideScrollIndex}" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+        </ItemsControl>
+      </Grid>
+    </Border>
+
+    <!-- ===================== 中：关系网（深度可调、可拖动、可缩放） ===================== -->
+    <Grid Grid.Column="2" Background="{DynamicResource BgBrush}">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+      </Grid.RowDefinitions>
+
+      <Border Grid.Row="0" Background="{DynamicResource PanelBrush}"
+              BorderBrush="{DynamicResource BorderBrush2}" BorderThickness="0,0,0,1" Padding="14,8,14,9">
+        <StackPanel>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="{Binding GuideCenterText}" FontSize="13" FontWeight="SemiBold"
+                       Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+            <TextBlock Text="深度" FontSize="12" Foreground="{DynamicResource SubtleBrush}"
+                       VerticalAlignment="Center" Margin="16,0,6,0" />
+            <ComboBox Width="64" Height="26" VerticalContentAlignment="Center"
+                      ItemsSource="{Binding DepthChoices}" SelectedItem="{Binding CodexDepth, Mode=TwoWay}"
+                      ToolTip="从中心向外展开几层（1–4）" />
+            <CheckBox Content="高亮已算出的路线" Margin="14,0,0,0" VerticalAlignment="Center"
+                      IsChecked="{Binding GuideHighlightRoutes, Mode=TwoWay}"
+                      ToolTip="把算出的那几条路线在图上加粗" />
+            <Button Content="回到中心" Style="{DynamicResource GhostButton}" Margin="14,0,0,0"
+                    Command="{Binding RecenterCommand}" />
+            <TextBlock Text="缩放" FontSize="12" Foreground="{DynamicResource SubtleBrush}"
+                       VerticalAlignment="Center" Margin="16,0,6,0" />
+            <Button Content="−" Style="{DynamicResource GhostButton}" Width="28"
+                    Command="{Binding ZoomOutCommand}" ToolTip="缩小（也可以 Ctrl + 滚轮）" />
+            <Button Content="{Binding ZoomText}" Style="{DynamicResource GhostButton}" Width="60"
+                    Command="{Binding ZoomResetCommand}" ToolTip="恢复 100%（Ctrl + 滚轮可无级缩放）" />
+            <Button Content="＋" Style="{DynamicResource GhostButton}" Width="28"
+                    Command="{Binding ZoomInCommand}" ToolTip="放大（也可以 Ctrl + 滚轮）" />
+          </StackPanel>
+          <TextBlock Text="{Binding GuideSummary}" Style="{DynamicResource HintText}" Margin="0,5,0,0" />
+          <TextBlock Text="{Binding GuideGraph.TruncatedNote}" Style="{DynamicResource HintText}"
+                     Foreground="{DynamicResource WarnBrush}" Margin="0,2,0,0"
+                     Visibility="{Binding GuideGraph.IsTruncated, Converter={StaticResource BoolVisibility}}" />
+        </StackPanel>
+      </Border>
+
+      <!-- 关系网宿主：内部滚动 + 缩放 + 拖动平移，中心节点自动居中 -->
+      <view:CodexGraphHost Grid.Row="1" Graph="{Binding GuideGraph}" NodeTemplate="{StaticResource CodexNode}"
+                           Zoom="{Binding Zoom, Mode=TwoWay}" Background="Transparent" />
+
+      <!-- 首次进来要读缩略图 + 建关系网，先盖一层，免得看着像卡死 -->
+      <Border Grid.Row="0" Grid.RowSpan="2" Background="#CCF4F6F8"
+              Visibility="{Binding GuideBusy, Converter={StaticResource BoolVisibility}}">
+        <Border CornerRadius="10" Background="{DynamicResource PanelBrush}"
+                BorderBrush="{DynamicResource BorderBrush2}" BorderThickness="1"
+                Padding="26,18" HorizontalAlignment="Center" VerticalAlignment="Center">
+          <StackPanel>
+            <TextBlock Text="{Binding GuideBusyText}" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" />
+            <TextBlock Text="首次进入要读图片缩略图并生成关系网，之后会快很多"
+                       Style="{DynamicResource HintText}" TextAlignment="Center" Margin="0,7,0,0" />
+          </StackPanel>
+        </Border>
+      </Border>
+    </Grid>
+
+    <GridSplitter Grid.Column="1" Style="{DynamicResource ColumnSplitter}" />
+  </Grid>
+</UserControl>

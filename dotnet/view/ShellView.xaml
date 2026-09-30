@@ -1,0 +1,484 @@
+<Window x:Class="DscsEvolutionPlanner.View.ShellView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:view="clr-namespace:DscsEvolutionPlanner.View"
+        Title="数码宝贝网络侦探图鉴·规划 · DscsEvolutionPlanner"
+        Width="{Binding WindowWidth}" Height="{Binding WindowHeight}"
+        MinWidth="{Binding WindowMinWidth}" MinHeight="{Binding WindowMinHeight}"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None" ResizeMode="CanResize"
+        Background="{DynamicResource BgBrush}"
+        TextElement.Foreground="{DynamicResource TextBrush}"
+        TextElement.FontFamily="{DynamicResource UiFont}"
+        TextElement.FontSize="13"
+        UseLayoutRounding="True" SnapsToDevicePixels="True">
+
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="36" ResizeBorderThickness="6" GlassFrameThickness="0"
+                        CornerRadius="0" UseAeroCaptionButtons="False" />
+  </shell:WindowChrome.WindowChrome>
+
+  <Window.Resources>
+    <!-- 详情栏里的属性数值表：标签列共享宽度，数值列右对齐 -->
+    <DataTemplate x:Key="StatRow">
+      <Border BorderBrush="{DynamicResource GridBrush}" BorderThickness="0,0,0,1">
+        <Grid Height="27">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" SharedSizeGroup="StatLabel" />
+            <ColumnDefinition Width="78" />
+            <ColumnDefinition Width="78" />
+            <ColumnDefinition Width="52" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0" Text="{Binding Label}" Style="{DynamicResource StatLabelText}" />
+          <TextBlock Grid.Column="1" Text="{Binding Lv1}" Style="{DynamicResource StatValueText}" />
+          <TextBlock Grid.Column="2" Text="{Binding Lv99}" Style="{DynamicResource StatValueStrongText}" />
+          <TextBlock Grid.Column="3" Text="{Binding Delta}" Style="{DynamicResource StatDeltaText}" />
+        </Grid>
+      </Border>
+    </DataTemplate>
+
+
+    <!-- ======================== 自定义控件模板 ======================== -->
+    <!-- 名字候选输入框：输入 → 候选下拉（名称 + 匹配度），上下键 / 回车 / Esc 都在控件内部处理 -->
+    <ControlTemplate x:Key="SuggestBoxTemplate" TargetType="{x:Type view:SuggestBox}">
+      <Grid>
+        <!-- 输入框本身可编辑：文本变化由 SuggestBox 统一处理（读输入框自己的文本，再同步给视图模型） -->
+        <TextBox x:Name="PART_Input" Height="32" FontSize="13" TextWrapping="NoWrap"
+                 VerticalContentAlignment="Center" />
+        <Popup x:Name="PART_Popup" Placement="Bottom" StaysOpen="False" AllowsTransparency="True"
+               Focusable="False" PopupAnimation="Fade"
+               PlacementTarget="{Binding ElementName=PART_Input}"
+               Width="{Binding ActualWidth, ElementName=PART_Input}">
+          <Border Margin="0,3,0,8" Background="{DynamicResource PanelBrush}"
+                  BorderBrush="{DynamicResource BorderBrush2}" BorderThickness="1" CornerRadius="8">
+            <Border.Effect>
+              <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.16" Color="#334155" />
+            </Border.Effect>
+            <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto" Padding="5">
+              <ListBox x:Name="PART_List" BorderThickness="0" Background="Transparent"
+                       ItemsSource="{Binding Suggestions, RelativeSource={RelativeSource TemplatedParent}}"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemContainerStyle>
+                  <Style TargetType="ListBoxItem">
+                    <Setter Property="Padding" Value="7,5" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    <Setter Property="SnapsToDevicePixels" Value="True" />
+                    <!-- 候选项不抢焦点：Tab 才会走到下一个输入框，而不是钻进下拉里 -->
+                    <Setter Property="Focusable" Value="False" />
+                    <Setter Property="Template">
+                      <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                          <Border x:Name="Bd" CornerRadius="6" Background="Transparent"
+                                  Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                          </Border>
+                          <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource GridBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentTintBrush}" />
+                            </Trigger>
+                          </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                      </Setter.Value>
+                    </Setter>
+                  </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <Grid ToolTip="{Binding Tip}">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Grid.Column="0" Text="{Binding IdText, Mode=OneWay}" FontSize="11"
+                                 Foreground="{DynamicResource FaintBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                      <TextBlock Grid.Column="1" Text="{Binding Name, Mode=OneWay}" FontSize="12.5"
+                                 TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="2" Text="{Binding ScoreText, Mode=OneWay}" FontSize="11.5"
+                                 FontFamily="{DynamicResource NumberFont}" Foreground="{DynamicResource SubtleBrush}"
+                                 VerticalAlignment="Center" Margin="10,0,0,0" />
+                    </Grid>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </ScrollViewer>
+          </Border>
+        </Popup>
+      </Grid>
+    </ControlTemplate>
+
+    <!-- 多选继承技下拉：按钮外观 + 弹层里的筛选、勾选、全选 / 清空 -->
+    <ControlTemplate x:Key="SkillPickerTemplate" TargetType="{x:Type view:SkillPicker}">
+      <Grid MinWidth="120">
+        <Button x:Name="PART_Field" Style="{DynamicResource FieldButton}">
+          <TextBlock Text="{Binding Summary, RelativeSource={RelativeSource TemplatedParent}}"
+                     FontSize="12.5" TextTrimming="CharacterEllipsis" />
+        </Button>
+
+        <Popup x:Name="PART_Popup" Placement="Bottom" StaysOpen="False" AllowsTransparency="True"
+               PopupAnimation="Fade"
+               IsOpen="{Binding IsOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+          <Border CornerRadius="10" Background="White" BorderBrush="{DynamicResource BorderBrush2}"
+                  BorderThickness="1" Margin="0,4,4,8">
+            <Border.Effect>
+              <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.16" Color="#233040" />
+            </Border.Effect>
+            <Grid Width="352" Height="336" Margin="10">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="30" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="34" />
+              </Grid.RowDefinitions>
+
+              <TextBox Grid.Row="0" Height="28" FontSize="12.5" ToolTip="输入关键字筛选，例如：耗竭"
+                       Text="{Binding FilterText, RelativeSource={RelativeSource TemplatedParent}, UpdateSourceTrigger=PropertyChanged}" />
+
+              <ListBox Grid.Row="1" Margin="0,6,0,0" BorderBrush="{DynamicResource BorderBrush2}" BorderThickness="1"
+                       ItemsSource="{Binding ItemsSource, RelativeSource={RelativeSource TemplatedParent}}"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                       VirtualizingPanel.IsVirtualizing="True"
+                       VirtualizingPanel.VirtualizationMode="Recycling">
+                <ListBox.ItemContainerStyle>
+                  <Style TargetType="ListBoxItem">
+                    <!-- 容器只负责排版：不吃内边距、不参与选中（没有任何选中视觉），
+                         整行的命中与勾选都交给行内的勾选框 -->
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="Focusable" Value="False" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    <Setter Property="Template">
+                      <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                          <ContentPresenter HorizontalAlignment="Stretch" />
+                        </ControlTemplate>
+                      </Setter.Value>
+                    </Setter>
+                  </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <!-- 整行一个勾选框：内边距也在勾选框里，行与行紧贴，
+                         这样不存在「看着能点、实际点不到」的缝隙 -->
+                    <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" HorizontalAlignment="Stretch">
+                      <CheckBox.Template>
+                        <ControlTemplate TargetType="CheckBox">
+                          <Border Background="Transparent" Padding="6,6">
+                            <Grid Height="16">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                              </Grid.ColumnDefinitions>
+                              <Border x:Name="Box" Grid.Column="0" Width="15" Height="15" CornerRadius="4"
+                                      Background="White" BorderBrush="{DynamicResource CheckBorderBrush}"
+                                      BorderThickness="1.4" VerticalAlignment="Center">
+                                <Path x:Name="Tick" Data="M 3,7.6 L 6.1,10.6 L 11.4,4.2" Stroke="White"
+                                      StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      Visibility="Collapsed" />
+                              </Border>
+                              <ContentPresenter Grid.Column="1" Margin="7,0,8,0" VerticalAlignment="Center" />
+                              <TextBlock Grid.Column="2" Text="{Binding LevelText}" FontSize="11"
+                                         Foreground="{DynamicResource FaintBrush}" VerticalAlignment="Center" />
+                            </Grid>
+                          </Border>
+                          <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                              <Setter TargetName="Box" Property="Background" Value="{DynamicResource AccentBrush}" />
+                              <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                              <Setter TargetName="Tick" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                              <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                          </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                      </CheckBox.Template>
+                      <TextBlock Text="{Binding Name}" FontSize="12.5" TextWrapping="Wrap" />
+                    </CheckBox>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+
+              <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,6,0,0">
+                <Button Content="全选筛选结果" Style="{DynamicResource GhostButton}" Width="116"
+                        HorizontalAlignment="Left" Command="{Binding SelectAllCommand, RelativeSource={RelativeSource TemplatedParent}}" />
+                <Button Content="清空" Style="{DynamicResource GhostButton}" Width="64"
+                        HorizontalAlignment="Left" Command="{Binding ClearCommand, RelativeSource={RelativeSource TemplatedParent}}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+        </Popup>
+      </Grid>
+    </ControlTemplate>
+
+    <!-- 关系网宿主：内部滚动 + 缩放 + 拖动平移 -->
+    <ControlTemplate x:Key="CodexGraphHostTemplate" TargetType="{x:Type view:CodexGraphHost}">
+      <ScrollViewer x:Name="PART_Scroll" Background="Transparent"
+                    HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                    PanningMode="None" Padding="10">
+        <view:CodexGraph x:Name="PART_Graph"
+                         Graph="{Binding Graph, RelativeSource={RelativeSource TemplatedParent}}"
+                         NodeTemplate="{Binding NodeTemplate, RelativeSource={RelativeSource TemplatedParent}}"
+                         Background="Transparent" />
+      </ScrollViewer>
+    </ControlTemplate>
+
+    <Style TargetType="{x:Type view:SuggestBox}">
+      <Setter Property="Template" Value="{StaticResource SuggestBoxTemplate}" />
+    </Style>
+    <Style TargetType="{x:Type view:SkillPicker}">
+      <Setter Property="Template" Value="{StaticResource SkillPickerTemplate}" />
+    </Style>
+    <Style TargetType="{x:Type view:CodexGraphHost}">
+      <Setter Property="Template" Value="{StaticResource CodexGraphHostTemplate}" />
+    </Style>
+  </Window.Resources>
+
+  <Border BorderBrush="{DynamicResource BorderBrush2}" BorderThickness="1">
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="36" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="27" />
+      </Grid.RowDefinitions>
+
+      <!-- ======================== 自绘标题栏（可拖动 / 双击最大化由 WindowChrome 处理） ======================== -->
+      <Border Grid.Row="0" Background="{DynamicResource PanelBrush}"
+              BorderBrush="{DynamicResource BorderBrush2}" BorderThickness="0,0,0,1">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0"
+                      shell:WindowChrome.IsHitTestVisibleInChrome="True">
+            <TextBlock Text="数码兽进化路线规划器" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <Border Width="1" Height="16" Background="{DynamicResource BorderBrush2}" Margin="12,0,10,0" />
+            <ToggleButton Style="{DynamicResource ModeTab}" Content="路线"
+                          IsChecked="{Binding IsRouteMode, Mode=OneWay}"
+                          Command="{Binding ShowRoutesCommand}"
+                          ToolTip="按查询算出的进化路线" />
+            <ToggleButton Style="{DynamicResource ModeTab}" Content="图鉴" Margin="4,0,0,0"
+                          IsChecked="{Binding IsGuideMode, Mode=OneWay}"
+                          Command="{Binding ShowGuideCommand}"
+                          ToolTip="以某只数码兽为中心的进化关系网（深度可调、可拖动）" />
+          </StackPanel>
+
+          <TextBlock Grid.Column="1" Text="{Binding EnvText}" FontSize="11.5"
+                     Foreground="{DynamicResource FaintBrush}" HorizontalAlignment="Right"
+                     VerticalAlignment="Center" Margin="14,0,14,0"
+                     TextTrimming="CharacterEllipsis" MaxWidth="760" />
+
+          <StackPanel Grid.Column="2" Orientation="Horizontal"
+                      shell:WindowChrome.IsHitTestVisibleInChrome="True">
+            <Button Style="{DynamicResource CaptionButton}" Command="{Binding MinimizeCommand}" ToolTip="最小化">
+              <Grid Width="12" Height="12">
+                <Path Data="M0.5,6.5 H11.5"
+                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                      StrokeThickness="1.2" />
+              </Grid>
+            </Button>
+            <Button Style="{DynamicResource CaptionButton}" Command="{Binding MaximizeCommand}" ToolTip="最大化 / 还原">
+              <Grid Width="12" Height="12">
+                <Path Data="M0.5,0.5 H11.5 V11.5 H0.5 Z"
+                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                      StrokeThickness="1.1">
+                  <Path.Style>
+                    <Style TargetType="Path">
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                          <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </Path.Style>
+                </Path>
+                <Grid>
+                  <Grid.Style>
+                    <Style TargetType="Grid">
+                      <Setter Property="Visibility" Value="Collapsed" />
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                          <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </Grid.Style>
+                  <Path Data="M3.5,0.5 H11.5 V8.5"
+                        Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                        StrokeThickness="1.1" />
+                  <Path Data="M0.5,3.5 H8.5 V11.5 H0.5 Z" Fill="{DynamicResource PanelBrush}"
+                        Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                        StrokeThickness="1.1" />
+                </Grid>
+              </Grid>
+            </Button>
+            <Button Style="{DynamicResource CloseCaptionButton}" Command="{Binding CloseCommand}" ToolTip="关闭">
+              <Grid Width="12" Height="12">
+                <Path Data="M0.5,0.5 L11.5,11.5 M11.5,0.5 L0.5,11.5"
+                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                      StrokeThickness="1.2" />
+              </Grid>
+            </Button>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- ======================== 主体：一次只挂一页 + 右侧详情栏 ======================== -->
+      <Grid Grid.Row="1">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" MinWidth="320" />
+          <ColumnDefinition Width="6" />
+          <ColumnDefinition Width="{Binding DetailsColumnWidth}" MinWidth="300" />
+        </Grid.ColumnDefinitions>
+
+        <!-- 换页：两页都是绑定驱动的视图，用可见性切换（切回时保留各自的视图状态） -->
+        <view:EvolutionRouteView Grid.Column="0"
+                                 Visibility="{Binding IsRouteMode, Converter={StaticResource BoolVisibility}}" />
+        <view:IllustratedGuideView Grid.Column="0"
+                                   Visibility="{Binding IsGuideMode, Converter={StaticResource BoolVisibility}}" />
+        <!-- 右侧详情栏 -->
+        <Border Grid.Column="2" Background="{DynamicResource PanelBrush}"
+                BorderBrush="{DynamicResource BorderBrush2}" BorderThickness="1,0,0,0">
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="18,16,16,20" Grid.IsSharedSizeScope="True">
+
+              <!-- 没选中时的空态 -->
+              <StackPanel Visibility="{Binding HasDetail, Converter={StaticResource BoolVisibility}, ConverterParameter=invert}">
+                <Border Width="152" Height="152" CornerRadius="10" HorizontalAlignment="Center"
+                        Background="{DynamicResource PlaceholderFillBrush}"
+                        BorderBrush="{DynamicResource PlaceholderBorderBrush}" BorderThickness="1">
+                  <Grid>
+                    <TextBlock Text="?" FontSize="46" FontWeight="Bold"
+                               Foreground="{DynamicResource PlaceholderGlyphBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <TextBlock Text="图片待补" FontSize="10" Foreground="{DynamicResource FaintBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,10" />
+                  </Grid>
+                </Border>
+                <TextBlock Text="{Binding DetailsHint}" Style="{DynamicResource HintText}"
+                           TextAlignment="Center" Margin="0,16,0,0" />
+              </StackPanel>
+
+              <!-- 详情内容：外层用壳的 DataContext 判可见性，只有图片那一段换成「当前选中的数码兽」 -->
+              <StackPanel Visibility="{Binding HasDetail, Converter={StaticResource BoolVisibility}}">
+
+                <!-- 图片：DataContext 换成选中的数码兽；未选中时内容为 null，模板整体不生成 -->
+                <ContentControl HorizontalAlignment="Center" Content="{Binding SelectedDetail}">
+                  <ContentControl.ContentTemplate>
+                    <DataTemplate>
+                      <Border Width="152" Height="152" CornerRadius="10" HorizontalAlignment="Center"
+                              Background="{DynamicResource PlaceholderFillBrush}"
+                              BorderBrush="{DynamicResource PlaceholderBorderBrush}" BorderThickness="1">
+                        <Grid>
+                          <Grid Visibility="{Binding HasImage, Converter={StaticResource BoolVisibility}, ConverterParameter=invert}">
+                            <TextBlock Text="?" FontSize="46" FontWeight="Bold"
+                                       Foreground="{DynamicResource PlaceholderGlyphBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <TextBlock Text="图片待补" FontSize="10" Foreground="{DynamicResource FaintBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,10" />
+                          </Grid>
+                          <Image Source="{Binding Image}" Stretch="Uniform"
+                                 Visibility="{Binding HasImage, Converter={StaticResource BoolVisibility}}" />
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ContentControl.ContentTemplate>
+                </ContentControl>
+
+                <StackPanel DataContext="{Binding SelectedDetail}">
+                  <TextBlock Text="{Binding Title}" FontSize="16.5" FontWeight="Bold" TextAlignment="Center"
+                             TextWrapping="Wrap" Margin="0,12,0,0" />
+                  <TextBlock Text="{Binding AliasText}" Visibility="{Binding HasAlias, Converter={StaticResource BoolVisibility}}"
+                             FontSize="11.5" Foreground="{DynamicResource FaintBrush}" TextAlignment="Center" Margin="0,3,0,0" />
+                  <TextBlock Text="{Binding TraitsText}" FontSize="12" Foreground="{DynamicResource SubtleBrush}"
+                             TextAlignment="Center" TextWrapping="Wrap" Margin="0,7,0,0" />
+                  <TextBlock Text="{Binding SlotText}" FontSize="12" Foreground="{DynamicResource SubtleBrush}"
+                             TextAlignment="Center" TextWrapping="Wrap" Margin="0,2,0,0" />
+
+                  <Border Height="1" Background="{DynamicResource GridBrush}" Margin="0,13,0,11" />
+
+                  <StackPanel Visibility="{Binding HasSs, Converter={StaticResource BoolVisibility}}">
+                    <TextBlock Text="SS" FontSize="11.5" Foreground="{DynamicResource FaintBrush}" />
+                    <TextBlock Text="{Binding SsName}" FontSize="13.5" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,2,0,0" />
+                    <TextBlock Text="{Binding SsDesc}" FontSize="12" Foreground="{DynamicResource SubtleBrush}"
+                               TextWrapping="Wrap" Margin="0,3,0,0" />
+                  </StackPanel>
+
+                  <StackPanel Visibility="{Binding HasMove, Converter={StaticResource BoolVisibility}}" Margin="0,11,0,0">
+                    <TextBlock Text="必杀技" FontSize="11.5" Foreground="{DynamicResource FaintBrush}" />
+                    <TextBlock Text="{Binding MoveName}" FontSize="13.5" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,2,0,0" />
+                    <TextBlock Text="{Binding MoveDesc}" FontSize="12" Foreground="{DynamicResource SubtleBrush}"
+                               TextWrapping="Wrap" Margin="0,3,0,0" />
+                  </StackPanel>
+
+                <!-- 属性数值表（Lv.1 / Lv.99 / 成长） -->
+                <Border Height="1" Background="{DynamicResource GridBrush}" Margin="0,13,0,11"
+                        Visibility="{Binding HasStats, Converter={StaticResource BoolVisibility}}" />
+                <StackPanel Visibility="{Binding HasStats, Converter={StaticResource BoolVisibility}}">
+                  <TextBlock Text="属性数值" FontSize="11.5" Foreground="{DynamicResource FaintBrush}" Margin="0,0,0,6" />
+                  <Grid Margin="0,0,0,3">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="StatLabel" />
+                      <ColumnDefinition Width="78" />
+                      <ColumnDefinition Width="78" />
+                      <ColumnDefinition Width="52" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="属性" Style="{DynamicResource StatHeaderText}" />
+                    <TextBlock Grid.Column="1" Text="Lv.1" Style="{DynamicResource StatHeaderText}" TextAlignment="Right" />
+                    <TextBlock Grid.Column="2" Text="Lv.99" Style="{DynamicResource StatHeaderText}" TextAlignment="Right" />
+                    <TextBlock Grid.Column="3" Text="成长" Style="{DynamicResource StatHeaderText}" TextAlignment="Right" />
+                  </Grid>
+                  <Border Height="1" Background="{DynamicResource GridBrush}" />
+                  <ItemsControl ItemsSource="{Binding Stats}" ItemTemplate="{StaticResource StatRow}" />
+                </StackPanel>
+
+                <!-- 可继承技 -->
+                <Border Height="1" Background="{DynamicResource GridBrush}" Margin="0,13,0,11"
+                        Visibility="{Binding HasSkills, Converter={StaticResource BoolVisibility}}" />
+                <StackPanel Visibility="{Binding HasSkills, Converter={StaticResource BoolVisibility}}">
+                  <TextBlock Text="可继承技（右侧是这只数码兽学会它的等级）" FontSize="11.5"
+                             Foreground="{DynamicResource FaintBrush}" />
+                  <ItemsControl ItemsSource="{Binding Skills}" Margin="0,5,0,0">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Grid Margin="0,0,0,4" ToolTip="{Binding LevelTip}">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="SkillLevel" />
+                          </Grid.ColumnDefinitions>
+                          <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12.5"
+                                     Foreground="{DynamicResource ViaBrush}" TextWrapping="Wrap" />
+                          <TextBlock Grid.Column="1" Text="{Binding LevelText}" FontSize="12" TextAlignment="Right"
+                                     FontFamily="{DynamicResource NumberFont}" VerticalAlignment="Top" Margin="8,0,0,0"
+                                     Foreground="{Binding LevelKey, Converter={StaticResource BrushKey}}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Text="{Binding SkillNote}" Visibility="{Binding HasSkillNote, Converter={StaticResource BoolVisibility}}"
+                             FontSize="10.5" Foreground="{DynamicResource FaintBrush}" TextWrapping="Wrap" Margin="0,3,0,0" />
+                </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
+
+        <GridSplitter Grid.Column="1" Style="{DynamicResource ColumnSplitter}" />
+      </Grid>
+
+      <!-- ======================== 状态栏 ======================== -->
+      <Border Grid.Row="2" Background="{DynamicResource PanelBrush}"
+              BorderBrush="{DynamicResource BorderBrush2}" BorderThickness="0,1,0,0">
+        <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusKey, Converter={StaticResource BrushKey}}"
+                   FontSize="11.5" VerticalAlignment="Center" Margin="18,0,14,0" TextTrimming="CharacterEllipsis" />
+      </Border>
+    </Grid>
+  </Border>
+</Window>

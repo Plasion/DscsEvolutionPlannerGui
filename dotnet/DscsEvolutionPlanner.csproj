@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>DscsEvolutionPlanner</RootNamespace>
+    <AssemblyName>DscsEvolutionPlanner</AssemblyName>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <Version>0.1.0</Version>
+    <Product>DscsEvolutionPlanner</Product>
+    <AssemblyTitle>数码兽进化路线规划器</AssemblyTitle>
+    <NeutralLanguage>zh-Hans</NeutralLanguage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 算法内置于程序；这里只带数据：拼音表 + 一份 data.csv（构建时从 py/ 复制过来，保持单一数据源） -->
+    <None Remove="Data\PinyinTable.json" />
+    <Content Include="Data\PinyinTable.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Remove="config.json" />
+    <Content Include="config.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Remove="..\py\data.csv" />
+    <Content Include="..\py\data.csv" Link="data.csv" CopyToOutputDirectory="PreserveNewest" />
+    <None Remove="assets\**" />
+    <Content Include="assets\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

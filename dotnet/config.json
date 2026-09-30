@@ -1,0 +1,38 @@
+{
+  // 可调参数。程序从 exe 目录往上找到的第一份 config.json 生效（开发时就是这份）；
+  // 删掉某一行＝退回内置默认值（见 Core/AppConfig.cs）。改完重启程序即可，不用重新构建。
+  "search": {
+    "defaultK": 3,              // 「重置」后的路径条数
+    "maxK": 50,                 // 路径条数上限（界面输入会被夹到 1..maxK）
+    "suggestLimit": 24,         // 起点 / 终点候选下拉条数
+    "codexFilterLimit": 400,    // 图鉴筛选最多取多少候选
+    "codexFilterMinScore": 0.7, // 图鉴筛选的匹配度门槛：低于它的候选不显示；0＝不过滤
+    "exactScore": 0.999,        // 输入框下面那行提示里算「完全匹配」的分数
+    "goodScore": 0.6            // 算「相似度」而不是「弱匹配」的分数
+  },
+  "codex": {
+    "defaultDepth": 2,
+    "maxDepth": 4,
+    "maxNodes": 160,            // 关系网节点上限，超出截断并提示
+    "minZoom": 0.4,
+    "maxZoom": 2.0,
+    "zoomButtonStep": 1.15,     // 工具条 −/＋ 的步进
+    "zoomWheelStep": 1.12,      // Ctrl + 滚轮 的步进
+    "panThreshold": 5,          // 拖动平移触发阈值（像素）
+    "doubleClickMs": 400,       // 节点双击判定窗口（毫秒）
+    "graphPadding": 360,        // 关系网四周留白（也是可拖动范围）
+    "columnGap": 76,            // 关系网层间距
+    "rowGap": 14,               // 关系网层内节点间距
+    "thumbnailWidth": 160       // 缩略图解码宽度
+  },
+  "layout": {
+    "windowWidth": 1480,
+    "windowHeight": 930,
+    "minWindowWidth": 1120,
+    "minWindowHeight": 720,
+    "leftColumnWidth": 392,        // 双击分隔条恢复的左栏默认宽
+    "minLeftColumnWidth": 200,
+    "detailsColumnWidth": 380,     // 双击分隔条恢复的详情栏默认宽
+    "minDetailsColumnWidth": 300
+  }
+}
